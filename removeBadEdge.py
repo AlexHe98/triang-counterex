@@ -27,6 +27,13 @@ from triangCounterexHelpers import degDefect
 from triangCounterexHelpers import relabelEdges
 
 
+BADNAME = "Bad edges"
+
+
+def isBad( edge ):
+    raise NotImplementedError
+
+
 def complexity( tri, badEdges ):
     mulDefs = [ mulDefect( tri.edge(i) ) for i in badEdges ]
     degDefs = [ degDefect( tri.edge(i) ) for i in badEdges ]
@@ -43,7 +50,7 @@ class RemoveBadEdgeData:
     Stores all the data that needs to be shared between processes when
     running the removeBadEdge() routine.
     """
-    def __init__( self, s, nProcesses, interval, isBad ):
+    def __init__( self, s, nProcesses, interval ):
         """
         Initialises shared search data.
 
@@ -70,9 +77,6 @@ class RemoveBadEdgeData:
         t = Triangulation3.fromIsoSig(s)
         b = [ e.index() for e in t.edges() if isBad(e) ]
 
-        # Share isBad() routine with all processes.
-        self._isBad = isBad
-
         # Priority queue of isomorphism signatures to explore.
         self._queue = PriorityQueue()
         self.enqueue(
@@ -80,12 +84,6 @@ class RemoveBadEdgeData:
                 complexity( t, b ),
                 tuple(b),
                 None ) # Initial sig has no source.
-
-    def getIsBadRoutine(self):
-        """
-        Returns a routine for testing whether an edge is "bad".
-        """
-        return self._isBad
 
     def totalTime(self):
         """
@@ -212,7 +210,8 @@ class RemoveBadEdgeData:
 
 class RemoveBadEdgeManager(SyncManager):
     pass
-RemoveBadEdgeManager.register( "RemoveBadEdgeData", RemoveBadEdgeData )
+if __name__ == "__main__":
+    RemoveBadEdgeManager.register( "RemoveBadEdgeData", RemoveBadEdgeData )
 
 
 def removeBadEdgeExplore(
@@ -313,7 +312,6 @@ def removeBadEdgeExplore(
         with lock:
             if shared.alreadySeen(newSig):
                 continue
-            isBad = shared.getIsBadRoutine()
 
         # Did we introduce a bad edge?
         # This computation could potentially be very expensive, so we should
@@ -442,7 +440,7 @@ def removeBadEdgeLoop( shared, lock, cond ):
         removeBadEdgeExplore( sig, priority, source, shared, lock, cond )
 
 
-def removeBadEdge( s, isBad, nProcesses, interval ):
+def removeBadEdge( s, nProcesses, interval ):
     """
     Starting at the given isomorphism signature s, and using the given number
     of parallel processes, searches for a 3-2 move that removes a bad edge
@@ -484,7 +482,7 @@ def removeBadEdge( s, isBad, nProcesses, interval ):
     manager.start()
     lock = manager.Lock()
     cond = manager.Condition(lock)
-    shared = manager.RemoveBadEdgeData( s, nProcesses, interval, isBad )
+    shared = manager.RemoveBadEdgeData( s, nProcesses, interval )
     processes = [
             Process( target=removeBadEdgeLoop, args=( shared, lock, cond ) )
             for _ in range(nProcesses) ]
@@ -498,10 +496,17 @@ def removeBadEdge( s, isBad, nProcesses, interval ):
     results = shared.getResults()
     for r, comp in results:
         rem = shared.badEdges(r)
-        print( "Result: {}. Complexity: {}. Remaining edges: {}".format(
-            r, comp, rem ) )
+        print( "Result: {}. Complexity: {}. {}: {}".format(
+            r, comp, BADNAME, rem ) )
         path = shared.backtrack(r)
         for s in path:
             print( "    {}".format(s) )
     return results
 
+
+if __name__ == "__main__":
+    sig = argv[1]
+    nProcesses = int( argv[2] )
+    interval = int( argv[3] )
+    print( "Results: {}\n".format( removeBadEdge(
+        sig, nProcesses, interval ) ) )
