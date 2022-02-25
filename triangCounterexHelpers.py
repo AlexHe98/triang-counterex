@@ -4,6 +4,20 @@ Helper functions for searching the Pachner graph for counterexamples.
 from regina import *
 
 
+def isCore( edge ):
+    """
+    Returns True if and only if pinching the given edge yields an ideal
+    triangulation of the solid torus; if edge belongs to a triangulation of
+    a lens space, then this corresponds to edge forming a core loop.
+
+    Note that this routine relies on normal surface theory, so it may be very
+    slow if the given edge belongs to a large triangulation.
+    """
+    tri = Triangulation3( edge.triangulation() )
+    tri.pinchEdge( tri.edge( edge.index() ) )
+    return tri.isSolidTorus()
+
+
 def pinchGivesHandlebody( edge, genus ):
     """
     Returns True if and only if pinching the given edge yields an ideal
@@ -23,6 +37,9 @@ def isTunnel( edge ):
     triangulation of the orientable genus-2 handlebody; if edge belongs to a
     triangulation of the complement of a knot with tunnel number 1, then this
     corresponds to edge forming a tunnel.
+
+    Note that this routine relies on normal surface theory, so it may be very
+    slow if the given edge belongs to a large triangulation.
     """
     return pinchGivesHandlebody( edge, 2 )
 
