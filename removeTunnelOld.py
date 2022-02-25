@@ -1,11 +1,18 @@
 """
-Given a triangulation with at least one "bad" edge (where "bad" stands for
-any property of an edge that can be computed algorithmically), search for a
-3-2 move that removes a bad edge, prioritising triangulations in which:
-(1) the maximum "multiplicity defect" among bad edges is small (see the
+Search for a 1-vertex ideal triangulation of a knot complement in which no
+edge forms a "tunnel"; in other words, for each edge e of the triangulation,
+pinching e yields an ideal triangulation that does *not* represent an
+orientable genus-2 handlebody.
+
+To do this, we start with a triangulation that has at least one tunnel edge;
+for example, the triangulation given by the isomorphism signature "cPcbbbadu"
+is an ideal triangulation of the trefoil knot with two edges, exactly one of
+which is a tunnel. We then search the Pachner graph for a 3-2 move that
+removes a tunnel edge, prioritising triangulations in which:
+(1) the maximum "multiplicity defect" among tunnel edges is small (see the
     mulDefect() routine);
-(2) the maximum "degree defect" among bad edges is small (see the degDefect()
-    routine); and
+(2) the maximum "degree defect" among tunnel edges is small (see the
+    degDefect() routine); and
 (3) the number of tetrahedra is small.
 
 This is written to run with either Python 2 or Python 3, without needing to
@@ -14,7 +21,7 @@ rewrite any code.
 from __future__ import print_function
 from sys import stdout
 from timeit import default_timer
-from multiprocessing import Condition, Process
+from multiprocessing import Condition
 from multiprocessing.managers import SyncManager
 try:
     from queue import Empty, PriorityQueue
@@ -25,6 +32,14 @@ from pachner import twoThree, threeTwo
 from triangCounterexHelpers import mulDefect
 from triangCounterexHelpers import degDefect
 from triangCounterexHelpers import relabelEdges
+from triangCounterexHelpers import pinchGivesHandlebody
+
+
+BADNAME = "Tunnels"
+
+
+def isBad( edge ):
+    return pinchGivesHandlebody(edge, 2)
 
 
 def complexity( tri, badEdges ):
@@ -43,7 +58,7 @@ class RemoveBadEdgeData:
     Stores all the data that needs to be shared between processes when
     running the removeBadEdge() routine.
     """
-    def __init__( self, s, nProcesses, interval, isBad ):
+    def __init__( self, s, nProcesses, interval ):
         """
         Initialises shared search data.
 
@@ -72,12 +87,9 @@ class RemoveBadEdgeData:
         b = [ e.index() for e in t.edges() if isBad(e) ]
         c = complexity( t, b )
 
-        # Share isBad routine with all processes.
-        self._isBad = isBad
-
         # Priority queue of isomorphism signatures to explore.
         # Note that everything else needs to have been initialised before
-        # calling enqueue().
+        # calling enqueue()
         self._queue = PriorityQueue()
         self.enqueue( s, c, tuple(b),
                 None ) # Initial sig has no source.
@@ -87,13 +99,6 @@ class RemoveBadEdgeData:
         Returns the time elapsed since self was initialised.
         """
         return default_timer() - self._start
-
-    def getIsBadRoutine(self):
-        """
-        Returns a routine that takes a single edge as input and determines
-        whether this edge is bad.
-        """
-        return self._isBad
 
     def _minComplexity(self):
         return self._details[ self._minSig ][2]
@@ -315,8 +320,6 @@ def removeBadEdgeExplore(
                         newSig, priority, relBadEdges, newSource )
 
     # Now try all 2-3 moves that introduce a good edge.
-    with lock:
-        isBad = shared.getIsBadRoutine()
     for triangle in tri.triangles():
         result = twoThree(triangle)
         if result is None:
@@ -454,68 +457,4 @@ def removeBadEdgeLoop( shared, lock, cond ):
 
         # Explore sig. We do most of this independently of other processes.
         removeBadEdgeExplore( sig, priority, source, shared, lock, cond )
-
-
-def removeBadEdge( s, nProcesses, interval, isBad, badName ):
-    """
-    Starting at the given isomorphism signature s, and using the given number
-    of parallel processes, searches for a 3-2 move that removes a bad edge
-    from s, where we consider an edge e to be bad if and only if isBad(e)
-    returns True.
-
-    The search abides by the following constraints:
-    (1) Any 2-3 moves that introduce bad edges are ignored.
-    (2) Priority is given to triangulations in which the maximum
-        "multiplicity defect" (see the mulDefect() routine) among bad edges
-        is small, then to triangulations in which the maximum "degree defect"
-        (see the degDefect() routine) among bad edges is small, and then to
-        triangulations with fewer tetrahedra.
-    (3) Triangulations with equal priority are processed in order of
-        insertion.
-
-    If the search successfully finds one or more 3-2 moves that remove a bad
-    edge, then returns a list containing the isomorphism signatures of the
-    triangulations that result from performing these moves (it is possible
-    for multiple parallel processes to each find such a move at roughly the
-    same time, in which case the returned list will contain more than one
-    isomorphism signature).
-
-    It is also possible for the search to "get stuck" in a situation where
-    the only moves available are 2-3 moves that introduced bad edges (which
-    we ignore). In this case, returns an empty list.
-
-    Note: When run with multiple processes (i.e., nProcesses > 1), this
-    routine is not completely deterministic because insertion order may vary
-    across different run-throughs.
-
-    The given interval determines the number of seconds that we should wait
-    before printing some info to standard output.
-
-    Pre-condition:
-    --- The triangulation represented by s has at least one bad edge.
-    """
-    manager = RemoveBadEdgeManager()
-    manager.start()
-    lock = manager.Lock()
-    cond = manager.Condition(lock)
-    shared = manager.RemoveBadEdgeData( s, nProcesses, interval, isBad )
-    processes = [
-            Process( target=removeBadEdgeLoop, args=( shared, lock, cond ) )
-            for _ in range(nProcesses) ]
-    for p in processes:
-        p.start()
-    for p in processes:
-        p.join()
-
-    # Print some info, and then return results.
-    print( shared.info() )
-    results = shared.getResults()
-    for r, comp in results:
-        rem = shared.badEdges(r)
-        print( "Result: {}. Complexity: {}. {}: {}".format(
-            r, comp, badName, rem ) )
-        path = shared.backtrack(r)
-        for s in path:
-            print( "    {}".format(s) )
-    return results
 

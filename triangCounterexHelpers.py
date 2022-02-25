@@ -6,7 +6,7 @@ from regina import *
 
 def pinchGivesHandlebody( edge, genus ):
     """
-    Returns True if and only if pinching the giving edge yields an ideal
+    Returns True if and only if pinching the given edge yields an ideal
     triangulation of the orientable handlebody with the given genus.
 
     Note that this routine relies on normal surface theory, so it may be very
@@ -15,6 +15,16 @@ def pinchGivesHandlebody( edge, genus ):
     tri = Triangulation3( edge.triangulation() )
     tri.pinchEdge( tri.edge( edge.index() ) )
     return ( tri.isHandlebody() == genus )
+
+
+def isTunnel( edge ):
+    """
+    Returns True if and only if pinching the given edge yields an ideal
+    triangulation of the orientable genus-2 handlebody; if edge belongs to a
+    triangulation of the complement of a knot with tunnel number 1, then this
+    corresponds to edge forming a tunnel.
+    """
+    return pinchGivesHandlebody( edge, 2 )
 
 
 def mulDefect(e):
