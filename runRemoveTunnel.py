@@ -18,7 +18,7 @@ removes a tunnel edge, prioritising triangulations in which:
 This is written to run with either Python 2 or Python 3, without needing to
 rewrite any code.
 """
-from sys import argv
+from sys import argv, stdout
 from multiprocessing import Process
 from removeTunnel import BADNAME
 from removeTunnel import RemoveBadEdgeManager
@@ -93,5 +93,8 @@ if __name__ == "__main__":
     sig = argv[1]
     nProcesses = int( argv[2] )
     interval = int( argv[3] )
+    print( "Removing {}. Sig: {}. #Processes: {}.".format(
+        BADNAME.lower(), sig, nProcesses ) )
+    stdout.flush()
     print( "Results: {}\n".format( removeBadEdge(
         sig, nProcesses, interval ) ) )

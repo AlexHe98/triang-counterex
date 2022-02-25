@@ -82,15 +82,16 @@ class RemoveBadEdgeData:
         self._details = dict()
 
         # Initial triangulation.
+        self._minSig = s
         t = Triangulation3.fromIsoSig(s)
         b = [ e.index() for e in t.edges() if isBad(e) ]
+        c = complexity( t, b )
 
         # Priority queue of isomorphism signatures to explore.
+        # Note that everything else needs to have been initialised before
+        # calling enqueue()
         self._queue = PriorityQueue()
-        self.enqueue(
-                s,
-                complexity( t, b ),
-                tuple(b),
+        self.enqueue( s, c, tuple(b),
                 None ) # Initial sig has no source.
 
     def totalTime(self):
@@ -99,14 +100,19 @@ class RemoveBadEdgeData:
         """
         return default_timer() - self._start
 
+    def _minComplexity(self):
+        return self._details[ self._minSig ][2]
+
     def info(self):
         """
         Returns a string describing the time elapsed, the number of
-        triangulations discovered, and the number of triangulations
-        explored.
+        triangulations discovered, the number of triangulations explored, and
+        details of the triangulation with the smallest complexity that has
+        been discovered so far.
         """
-        return "Time: {:.6f}. Seen: {}. Visited: {}.".format(
-                self.totalTime(), self._total, self._explored )
+        return "Time: {:.6f}. Seen: {}. Visited: {}. Min: {}, {}.".format(
+                self.totalTime(), self._total, self._explored,
+                self._minComplexity(), self._minSig )
 
     def nRunning(self):
         """
@@ -127,6 +133,10 @@ class RemoveBadEdgeData:
         """
         self._nRunning += 1
 
+    def _updateMinSig( self, sig, priority ):
+        if priority < self._minComplexity():
+            self._minSig = sig
+
     def getResults(self):
         """
         Returns the (possibly empty) list of results.
@@ -139,7 +149,8 @@ class RemoveBadEdgeData:
         to stop as soon as possible.
         """
         self._results.append( ( sig, priority ) )
-        self._details[sig] = ( badEdges, source )
+        self._details[sig] = ( badEdges, source, priority )
+        self._updateMinSig( sig, priority )
         self._stop = True
 
     def stop(self):
@@ -180,7 +191,8 @@ class RemoveBadEdgeData:
                 ( priority, self._total, sig ),
                 False )
         self._total += 1
-        self._details[sig] = ( badEdges, source )
+        self._details[sig] = ( badEdges, source, priority )
+        self._updateMinSig( sig, priority )
 
     def dequeue(self):
         """
