@@ -296,6 +296,8 @@ def removeBadEdgeExplore(
             with lock:
                 if shared.alreadySeen(outSig):
                     continue
+                shared.enqueue(
+                        newSig, priority, relBadEdges, newSource )
                 shared.newResult(
                         outSig, outPriority, relOutBadEdges, outSource )
             foundResult = True
@@ -375,6 +377,8 @@ def removeBadEdgeExplore(
             with lock:
                 if shared.alreadySeen(outSig):
                     continue
+                shared.enqueue(
+                        newSig, priority, relBadEdges, newSource )
                 shared.newResult(
                         outSig, outPriority, relOutBadEdges, outSource )
         if foundResult:
