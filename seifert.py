@@ -64,6 +64,18 @@ def fastFibre(bounded):
     return bounded.retriangulate( height, nThreads, recognise ) 
 
 
+def annulusNotFibre( bounded ):
+    """
+    Given a bounded triangulation that results from drilling out an edge e in
+    a one-vertex triangulation of a small Seifert fibre space, uses essential
+    annuli to see whether we can verify that e is not isotopic to a Seifert
+    fibre.
+    """
+    # Search for annuli among the vertex normal surfaces.
+    # TODO
+    pass
+
+
 # Test code.
 if __name__ == "__main__":
     # Generate test triangulations.
@@ -103,5 +115,16 @@ if __name__ == "__main__":
                     print( msg.format("Fibre!") )
                 else:
                     print( msg.format("Inconclusive...") )
+
+                    # Can we find annuli among the vertex normal surfaces?
+                    surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
+                    for s in surfs:
+                        if not s.isOrientable():
+                            continue
+                        if s.countBoundaries() != 2:
+                            continue
+                        if s.eulerChar() == 0:
+                            print( "        {} ...".format(
+                                s.detail()[:60] ) )
         print()
 
