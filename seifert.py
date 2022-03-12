@@ -74,23 +74,120 @@ def isFibre(edge):
             return False
     height = 0
     nThreads = 1
-    if drilled.retriangulate( height, nThreads, recognise ):
-        if len(counts) != 1:
-            raise ValueError( "Wrong number of counts: {}".format(counts) )
-        fibreCount = counts[0]
-        if fibreCount == 2:
-            return Fibre.EXCEPTIONAL
-        elif fibreCount == 3:
-            return Fibre.REGULAR
-        else:
-            raise ValueError(
-                    "Should never get {} exceptional fibres.".format(
-                        fibreCount ) )
+    try:
+        isFibre = drilled.retriangulate( height, nThreads, recognise )
+    except ValueError as err:
+        # Unsolved case, so we can't make any conclusions from this.
+        pass
+    else:
+        if isFibre:
+            if len(counts) != 1:
+                raise ValueError( "Wrong number of counts: {}".format(counts) )
+            fibreCount = counts[0]
+            if fibreCount == 2:
+                return Fibre.EXCEPTIONAL
+            elif fibreCount == 3:
+                return Fibre.REGULAR
+            else:
+                raise ValueError(
+                        "Should never get {} exceptional fibres.".format(
+                            fibreCount ) )
 
-    # We need to try more powerful techniques: search for essential annuli
-    # and essential tori.
-    # TODO
-    return Fibre.UNKNOWN
+    # We need to try more powerful techniques: search for essential annuli.
+    # Fast tests have failed us, so we turn to something conclusive: search
+    # for essential annuli.
+    # If we started with an edge isotopic to a fibre in a small Seifert fibre
+    # space, then after drilling we should have a Seifert fibre space over
+    # the disc with either two or three exceptional fibres.
+    #   --> If there are two exceptional fibres, then there will be an
+    #       (essential) annulus that cuts the space into two solid tori.
+    #   --> If there are three exceptional fibres, then there will be an
+    #       (essential) annulus that cuts the space into a solid torus and
+    #       a Seifert fibre space over the disc with two exceptional fibres.
+    # Since the annuli of interest are essential, such annuli will appear as
+    # normal surfaces whenever they exist.
+    surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
+    annuli = []
+    for s in surfs:
+        if s.isOrientable() and s.eulerChar() == 0 and s.hasRealBoundary():
+            annuli.append(s)
+    if not annuli:
+        # The annulus that we are looking for doesn't exist.
+        return Fibre.NONFIBRE
+    for a in annuli:
+        # Try cutting along the annulus. If this is the annulus we are
+        # looking for, then we must get two pieces, at least one of which is
+        # a solid torus.
+        cut = a.cutAlong()
+        if cut.countComponents() != 2:
+            # Cutting along a only yields one piece, so it isn't the annulus
+            # we're looking for. Move along to the next annulus.
+            continue
+        notSolidTorus = []
+        for comp in cut.triangulateComponents():
+            comp.intelligentSimplify()
+            comp.intelligentSimplify()
+            if not comp.isSolidTorus():
+                notSolidTorus.append(comp)
+        nonSolidTorusCount = len(notSolidTorus)
+        if nonSolidTorusCount == 0:
+            return Fibre.EXCEPTIONAL
+        elif nonSolidTorusCount == 2:
+            # Cutting along a doesn't yield any solid torus pieces, so it
+            # isn't the annulus we're looking for. Move along.
+            continue
+
+        # Getting to this point means that cutting along a yields two pieces,
+        # exactly one of which is a solid torus. If a is the annulus we're
+        # looking for, then the other piece should be a Seifert fibre space
+        # over the disc with two exceptional fibres. First try to verify this
+        # using combinatorial recognition.
+        other = notSolidTorus[0]
+        def recognise2( sig, tri ):
+            # The following may raise a ValueError in an unsolved case.
+            fibreCount = isBlockedSFSOverDisc_(tri)
+            return ( fibreCount == 2 )
+        height = 0
+        nThreads = 1
+        try:
+            isRegular = other.retriangulate( height, nThreads, recognise2 )
+        except ValueError as err:
+            # Unsolved case, so we can't make any conclusions from this.
+            pass
+        else:
+            if isRegular:
+                return Fibre.REGULAR
+
+        # We need to resort to searching for an annulus again. This time, we
+        # are looking specifically for an annulus that cuts the other piece
+        # into two solid tori.
+        cutSurfs = NormalSurfaces.enumerate( notSolidTorus[0], NS_STANDARD )
+        for s in cutSurfs:
+            if not ( s.isOrientable() and s.eulerChar() == 0 and
+                    s.hasRealBoundary() ):
+                continue
+            
+            # The surface s is an annulus. Try cutting along s.
+            c = s.cutAlong()
+            if c.countComponents() != 2:
+                # Cutting along s only yields one piece, so it isn't the
+                # annulus we're looking for. Move along.
+                continue
+            onlySolidTori = True
+            for cc in c.triangulateComponents():
+                cc.intelligentSimplify()
+                cc.intelligentSimplify()
+                if not cc.isSolidTorus():
+                    # Cutting along s doesn't yield two solid tori, so it
+                    # isn't the annulus we're looking for. Move along.
+                    onlySolidTori = False
+                    break
+            if onlySolidTori:
+                return Fibre.REGULAR
+
+    # Surviving to this point means that the annulus we were looking for
+    # doesn't exist.
+    return Fibre.NONFIBRE
 
 
 # Test code.
@@ -98,7 +195,12 @@ if __name__ == "__main__":
     # Generate test triangulations.
     tests = [
             ( "cPcbbbqxh", "SFS [S2: (2,1) (2,1) (2,-1)]" ),
-            ( "dLQbccchhrw", "SFS [S2: (2,1) (2,1) (3,-2)]" ) ]
+            ( "dLQbccchhrw", "SFS [S2: (2,1) (2,1) (3,-2)]" ),
+            ( "eLAkbccddemken", "SFS [S2: (2,1) (2,1) (2,1)]" ),
+            ( "eLAkbccddemkij", "SFS [S2: (2,1) (2,1) (3,-1)] : #1" ),
+            ( "eLPkbcddddrwos", "SFS [S2: (2,1) (2,1) (3,-1)] : #2" ),
+            ( "eLMkbcdddhhhqx", "SFS [S2: (2,1) (2,1) (4,-3)]" ),
+            ( "eLPkbcdddhrrnk", "SFS [S2: (2,1) (3,1) (3,-2)]" ) ]
     def genEdges(sig):
         tri = Triangulation3.fromIsoSig(sig)
         # What are the edges currently in the triangulation?
@@ -113,6 +215,7 @@ if __name__ == "__main__":
 
     # Perform tests.
     for sig, name in tests:
+        print()
         print( sig, name )
         for tri, i, name in genEdges(sig):
             msg = "    " + name + ": {}"
@@ -122,18 +225,17 @@ if __name__ == "__main__":
                 print( msg.format( err ) )
             else:
                 print( msg.format( fibreType.name ) )
-                if fibreType is Fibre.UNKNOWN:
-                    # Can we find annuli among the vertex normal surfaces?
-                    bounded = Triangulation3(tri)
-                    bounded.pinchEdge( bounded.edge(i) )
-                    bounded.idealToFinite()
-                    bounded.intelligentSimplify()
-                    bounded.intelligentSimplify()
-                    surfs = NormalSurfaces.enumerate( bounded, NS_STANDARD )
-                    for s in surfs:
-                        if ( s.isOrientable() and s.eulerChar() == 0 and
-                                s.hasRealBoundary() ):
-                            print( "        {} ...".format(
-                                s.detail()[:60] ) )
-        print()
+#                if fibreType is Fibre.UNKNOWN:
+#                    # Can we find annuli among the vertex normal surfaces?
+#                    bounded = Triangulation3(tri)
+#                    bounded.pinchEdge( bounded.edge(i) )
+#                    bounded.idealToFinite()
+#                    bounded.intelligentSimplify()
+#                    bounded.intelligentSimplify()
+#                    surfs = NormalSurfaces.enumerate( bounded, NS_STANDARD )
+#                    for s in surfs:
+#                        if ( s.isOrientable() and s.eulerChar() == 0 and
+#                                s.hasRealBoundary() ):
+#                            print( "        {} ...".format(
+#                                s.detail()[:60] ) )
 
