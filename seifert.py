@@ -212,6 +212,14 @@ if __name__ == "__main__":
             if result is None:
                 continue
             yield result[0], result[1][-1], "f{}".format(i)
+        for i in range(10):
+            RandomEngine.reseedWithHardware()
+            ii = RandomEngine.rand( tri.countTriangles() )
+            result = twoThree( tri.triangle(ii) )
+            if result is None:
+                break
+            tri = result[0]
+            yield tri, result[1][-1], "r{}".format(i)
 
     # Perform tests.
     for sig, name in tests:
@@ -224,18 +232,8 @@ if __name__ == "__main__":
             except ValueError as err:
                 print( msg.format( err ) )
             else:
-                print( msg.format( fibreType.name ) )
-#                if fibreType is Fibre.UNKNOWN:
-#                    # Can we find annuli among the vertex normal surfaces?
-#                    bounded = Triangulation3(tri)
-#                    bounded.pinchEdge( bounded.edge(i) )
-#                    bounded.idealToFinite()
-#                    bounded.intelligentSimplify()
-#                    bounded.intelligentSimplify()
-#                    surfs = NormalSurfaces.enumerate( bounded, NS_STANDARD )
-#                    for s in surfs:
-#                        if ( s.isOrientable() and s.eulerChar() == 0 and
-#                                s.hasRealBoundary() ):
-#                            print( "        {} ...".format(
-#                                s.detail()[:60] ) )
+                if fibreType is Fibre.NONFIBRE:
+                    print( msg.format( fibreType.name + "   <--" ) )
+                else:
+                    print( msg.format( fibreType.name ) )
 
