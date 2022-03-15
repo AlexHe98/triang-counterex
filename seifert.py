@@ -65,8 +65,11 @@ def isFibre(edge):
     drilled.intelligentSimplify()
     counts = []
     def recognise( sig, tri ):
-        # The following may raise a ValueError in an unsolved case.
-        fibreCount = isBlockedSFSOverDisc_(tri)
+        try:
+            # May raise a ValueError in an unsolved case.
+            fibreCount = isBlockedSFSOverDisc_(tri)
+        except ValueError:
+            return False
         if fibreCount in {2,3}:
             counts.append(fibreCount)
             return True
@@ -74,24 +77,18 @@ def isFibre(edge):
             return False
     height = 0
     nThreads = 1
-    try:
-        isFibre = drilled.retriangulate( height, nThreads, recognise )
-    except ValueError as err:
-        # Unsolved case, so we can't make any conclusions from this.
-        pass
-    else:
-        if isFibre:
-            if len(counts) != 1:
-                raise ValueError( "Wrong number of counts: {}".format(counts) )
-            fibreCount = counts[0]
-            if fibreCount == 2:
-                return Fibre.EXCEPTIONAL
-            elif fibreCount == 3:
-                return Fibre.REGULAR
-            else:
-                raise ValueError(
-                        "Should never get {} exceptional fibres.".format(
-                            fibreCount ) )
+    if drilled.retriangulate( height, nThreads, recognise ):
+        if len(counts) != 1:
+            raise ValueError( "Wrong number of counts: {}".format(counts) )
+        fibreCount = counts[0]
+        if fibreCount == 2:
+            return Fibre.EXCEPTIONAL
+        elif fibreCount == 3:
+            return Fibre.REGULAR
+        else:
+            raise ValueError(
+                    "Should never get {} exceptional fibres.".format(
+                        fibreCount ) )
 
     # We need to try more powerful techniques: search for essential annuli.
     # Fast tests have failed us, so we turn to something conclusive: search
@@ -144,19 +141,16 @@ def isFibre(edge):
         # using combinatorial recognition.
         other = notSolidTorus[0]
         def recognise2( sig, tri ):
-            # The following may raise a ValueError in an unsolved case.
-            fibreCount = isBlockedSFSOverDisc_(tri)
+            try:
+                # May raise a ValueError in an unsolved case.
+                fibreCount = isBlockedSFSOverDisc_(tri)
+            except ValueError:
+                return False
             return ( fibreCount == 2 )
         height = 0
         nThreads = 1
-        try:
-            isRegular = other.retriangulate( height, nThreads, recognise2 )
-        except ValueError as err:
-            # Unsolved case, so we can't make any conclusions from this.
-            pass
-        else:
-            if isRegular:
-                return Fibre.REGULAR
+        if other.retriangulate( height, nThreads, recognise2 ):
+            return Fibre.REGULAR
 
         # We need to resort to searching for an annulus again. This time, we
         # are looking specifically for an annulus that cuts the other piece
