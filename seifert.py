@@ -215,6 +215,26 @@ if __name__ == "__main__":
             tri = result[0]
             yield tri, result[1][-1], "r{}".format(i)
 
+    # How common are edges that are *not* isotopic to Seifert fibres?
+    def findNonFibres(sigs):
+        nonFibreSigs = set()
+        fibreSigs = set()
+        for s in sigs:
+            t = Triangulation3.fromIsoSig(s)
+            for f in t.triangles():
+                result = twoThree(f)
+                if result is None:
+                    continue
+                newt = result[0]
+                if isFibre( newt.edge( result[1][-1] ) ) is Fibre.NONFIBRE:
+                    nonFibreSigs.add( newt.isoSig() )
+                elif not nonFibreSigs:
+                    fibreSigs.add( newt.isoSig() )
+        if nonFibreSigs:
+            return ( True, nonFibreSigs )
+        else:
+            return ( False, fibreSigs )
+
     # Perform tests.
     for sig, name in tests:
         print()
@@ -230,4 +250,17 @@ if __name__ == "__main__":
                     print( msg.format( fibreType.name + "   <--" ) )
                 else:
                     print( msg.format( fibreType.name ) )
+        print()
+        height = 0
+        sigSet = {sig}
+        newNonFibres = 0
+        maxHeight = 4
+        maxSize = 15
+        while height < maxHeight and len(sigSet) < maxSize:
+            height += 1
+            foundNew, sigSet = findNonFibres(sigSet)
+            if foundNew:
+                newNonFibres += 1
+            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
+                height, len(sigSet), newNonFibres ) )
 
