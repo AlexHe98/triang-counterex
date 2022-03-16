@@ -90,20 +90,21 @@ def isFibre(edge):
                     "Should never get {} exceptional fibres.".format(
                         fibreCount ) )
 
-    # TODO Use compressing discs to rule out "degenerate" cases.
-    # We need to try more powerful techniques: search for essential annuli.
-    # Fast tests have failed us, so we turn to something conclusive: search
-    # for essential annuli.
+    # We need to try more powerful techniques: search for compressing discs
+    # and essential annuli.
     # If we started with an edge isotopic to a fibre in a small Seifert fibre
-    # space, then after drilling we should have a Seifert fibre space over
-    # the disc with either two or three exceptional fibres.
-    #   --> If there are two exceptional fibres, then there will be an
-    #       (essential) annulus that cuts the space into two solid tori.
-    #   --> If there are three exceptional fibres, then there will be an
-    #       (essential) annulus that cuts the space into a solid torus and
-    #       a Seifert fibre space over the disc with two exceptional fibres.
-    # Since the annuli of interest are essential, such annuli will appear as
-    # normal surfaces whenever they exist.
+    # space, then after drilling we should have a Seifert fibre space S over
+    # the disc with either two or three exceptional fibres. Either way, S
+    # cannot have a compressing disc. Moreover:
+    #   --> if there are two exceptional fibres, then there will be an
+    #       essential annulus that cuts S into two solid tori; and
+    #   --> if there are three exceptional fibres, then there will be an
+    #       essential annulus that cuts S into a solid torus and a Seifert
+    #       fibre space over the disc with two exceptional fibres.
+    # Since we always start by ruling out the presence of compressing discs,
+    # the annulus that we cut along must follow the core of any new solid
+    # torus pieces that we cut off.
+    # TODO Use compressing discs to rule out "degenerate" cases.
     surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
     annuli = []
     for s in surfs:
