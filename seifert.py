@@ -284,8 +284,8 @@ if __name__ == "__main__":
         height = 0
         sigSet = {sig}
         newNonFibres = 0
-        maxHeight = 4
-        maxSize = 15
+        maxHeight = 6
+        maxSize = 25
         while height < maxHeight and len(sigSet) < maxSize:
             height += 1
             foundNew, sigSet = findNonFibres(sigSet)
