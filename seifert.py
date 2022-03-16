@@ -112,11 +112,11 @@ def isFibre(edge):
         euler = s.eulerChar()
         if euler == 1:
             # The surface s is a disc. Check that it isn't a compressing disc
-            # by cutting along s and verifying that the boundary is still
-            # just a torus.
+            # by cutting along s and verifying that the torus boundary
+            # doesn't fall apart into a single sphere boundary.
             compress = s.cutAlong()
-            if ( compress.countBoundaryComponents() != 1 or
-                    compress.boundaryComponent(0).eulerChar() != 0 ):
+            if ( compress.countBoundaryComponents() == 1 and
+                    compress.boundaryComponent(0).eulerChar == 2 ):
                 return Fibre.NONFIBRE
         elif euler == 0:
             annuli.append(s)
@@ -179,8 +179,8 @@ def isFibre(edge):
                 # disc by cutting along s and verifying that the boundary is
                 # still just a torus.
                 compress = s.cutAlong()
-                if ( compress.countBoundaryComponents() != 1 or
-                        compress.boundaryComponent(0).eulerChar != 0 ):
+                if ( compress.countBoundaryComponents() == 1 and
+                        compress.boundaryComponent(0).eulerChar == 2 ):
                     hasCompress = True
                     break
             elif euler == 0:
@@ -285,7 +285,7 @@ if __name__ == "__main__":
         sigSet = {sig}
         newNonFibres = 0
         maxHeight = 6
-        maxSize = 25
+        maxSize = 15
         while height < maxHeight and len(sigSet) < maxSize:
             height += 1
             foundNew, sigSet = findNonFibres(sigSet)
