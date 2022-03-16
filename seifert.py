@@ -90,6 +90,7 @@ def isFibre(edge):
                     "Should never get {} exceptional fibres.".format(
                         fibreCount ) )
 
+    # TODO Use compressing discs to rule out "degenerate" cases.
     # We need to try more powerful techniques: search for essential annuli.
     # Fast tests have failed us, so we turn to something conclusive: search
     # for essential annuli.
@@ -106,7 +107,18 @@ def isFibre(edge):
     surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
     annuli = []
     for s in surfs:
-        if s.isOrientable() and s.eulerChar() == 0 and s.hasRealBoundary():
+        if not s.isOrientable() or not s.hasRealBoundary():
+            continue
+        euler = s.eulerChar()
+        if euler == 1:
+            # The surface s is a disc. Check that it isn't a compressing disc
+            # by cutting along s and verifying that the boundary is still
+            # just a torus.
+            compress = s.cutAlong()
+            if ( compress.countBoundaryComponents() != 1 or
+                    compress.boundaryComponent(0).eulerChar() != 0 ):
+                return Fibre.NONFIBRE
+        elif euler == 0:
             annuli.append(s)
     if not annuli:
         # The annulus that we are looking for doesn't exist.
@@ -156,15 +168,33 @@ def isFibre(edge):
         # are looking specifically for an annulus that cuts the other piece
         # into two solid tori.
         cutSurfs = NormalSurfaces.enumerate( notSolidTorus[0], NS_STANDARD )
+        cutAnnuli = []
+        hasCompress = False
         for s in cutSurfs:
-            if not ( s.isOrientable() and s.eulerChar() == 0 and
-                    s.hasRealBoundary() ):
+            if not s.isOrientable() or not s.hasRealBoundary():
                 continue
-            
-            # The surface s is an annulus. Try cutting along s.
-            c = s.cutAlong()
+            euler = s.eulerChar()
+            if euler == 1:
+                # The surface s is a disc. Check that it isn't a compressing
+                # disc by cutting along s and verifying that the boundary is
+                # still just a torus.
+                compress = s.cutAlong()
+                if ( compress.countBoundaryComponents() != 1 or
+                        compress.boundaryComponent(0).eulerChar != 0 ):
+                    hasCompress = True
+                    break
+            elif euler == 0:
+                cutAnnuli.append(s)
+        if hasCompress or not cutAnnuli:
+            # We have a compressing disc, or we don't have any annuli. In
+            # either case, the annulus a isn't the one we're looking for.
+            # Move along.
+            continue
+        for aa in cutAnnuli:
+            # Try cutting along aa.
+            c = aa.cutAlong()
             if c.countComponents() != 2:
-                # Cutting along s only yields one piece, so it isn't the
+                # Cutting along aa only yields one piece, so it isn't the
                 # annulus we're looking for. Move along.
                 continue
             onlySolidTori = True
@@ -172,7 +202,7 @@ def isFibre(edge):
                 cc.intelligentSimplify()
                 cc.intelligentSimplify()
                 if not cc.isSolidTorus():
-                    # Cutting along s doesn't yield two solid tori, so it
+                    # Cutting along aa doesn't yield two solid tori, so it
                     # isn't the annulus we're looking for. Move along.
                     onlySolidTori = False
                     break
