@@ -261,13 +261,20 @@ def isFibre(edge):
 if __name__ == "__main__":
     # Generate test triangulations.
     tests = [
-#            ( "cPcbbbqxh", "SFS [S2: (2,1) (2,1) (2,-1)]" ),
-#            ( "dLQbccchhrw", "SFS [S2: (2,1) (2,1) (3,-2)]" ),
-#            ( "eLAkbccddemken", "SFS [S2: (2,1) (2,1) (2,1)]" ),
-#            ( "eLAkbccddemkij", "SFS [S2: (2,1) (2,1) (3,-1)] : #1" ),
-#            ( "eLPkbcddddrwos", "SFS [S2: (2,1) (2,1) (3,-1)] : #2" ),
-#            ( "eLMkbcdddhhhqx", "SFS [S2: (2,1) (2,1) (4,-3)]" ),
+            ( "cPcbbbqxh", "SFS [S2: (2,1) (2,1) (2,-1)]" ),
+            ( "dLQbccchhrw", "SFS [S2: (2,1) (2,1) (3,-2)]" ),
+            ( "eLAkbccddemken", "SFS [S2: (2,1) (2,1) (2,1)]" ),
+            ( "eLAkbccddemkij", "SFS [S2: (2,1) (2,1) (3,-1)] : #1" ),
+            ( "eLPkbcddddrwos", "SFS [S2: (2,1) (2,1) (3,-1)] : #2" ),
+            ( "eLMkbcdddhhhqx", "SFS [S2: (2,1) (2,1) (4,-3)]" ),
             ( "eLPkbcdddhrrnk", "SFS [S2: (2,1) (3,1) (3,-2)]" ) ]
+#            ( "eLPkbcdddhrrnk", "SFS [S2: (2,1) (3,1) (3,-2)]" ),
+#            ( "fLLQcaceeedjkuxkn", "SFS [S2: (2,1) (3,1) (3,-1)] : #1" ),
+#            ( "fLLQcbeddeehhokum", "SFS [S2: (2,1) (3,1) (3,-1)] : #2" ),
+#            ( "fLLQcbeddeehhnkxx", "SFS [S2: (2,1) (3,1) (4,-3)] : #1" ),
+#            ( "fvPQcceddeerrnskr", "SFS [S2: (2,1) (3,1) (4,-3)] : #2" ),
+#            ( "fvPQcdecedekrsnrs", "SFS [S2: (2,1) (3,1) (5,-4)]" ),
+#            ( "fLLQcaceeedjkuxkj", "SFS [S2: (2,1) (3,2) (3,-1)]" ) ]
     def genEdges(sig):
         tri = Triangulation3.fromIsoSig(sig)
         # What are the edges currently in the triangulation?
@@ -327,8 +334,8 @@ if __name__ == "__main__":
         height = 0
         sigSet = {sig}
         newNonFibres = 0
-        maxHeight = 6
-        maxSize = 15
+        maxHeight = 5
+        maxSize = 12
         while height < maxHeight and len(sigSet) < maxSize:
             height += 1
             foundNew, sigSet = findNonFibres(sigSet)
