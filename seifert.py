@@ -10,10 +10,11 @@ from pachner import twoThree
 
 
 class Fibre(Enum):
-    UNKNOWN = auto()
-    NONFIBRE = auto()
-    EXCEPTIONAL = auto()
-    REGULAR = auto()
+    UNKNOWN = auto()        # Curve of entirely unknown type.
+    NONFIBRE = auto()       # Curve that is not a fibre.
+    FIBRE = auto()          # Curve that is a fibre of unknown type.
+    EXCEPTIONAL = auto()    # Curve that is an exceptional fibre.
+    REGULAR = auto()        # Curve that is a regular fibre.
 
 
 def isBlockedSFSOverDisc_(tri):
@@ -148,10 +149,8 @@ def isFibre(edge):
             continue
 
         # Getting to this point means that cutting along a yields two pieces,
-        # exactly one of which is a solid torus. If a is the annulus we're
-        # looking for, then the other piece should be a Seifert fibre space
-        # over the disc with two exceptional fibres. First try to verify this
-        # using combinatorial recognition.
+        # exactly one of which is a solid torus. We might not be able to
+        # certify fibres here...
         other = notSolidTorus[0]
         def recognise2( sig, tri ):
             try:
@@ -163,7 +162,8 @@ def isFibre(edge):
         height = 0
         nThreads = 1
         if other.retriangulate( height, nThreads, recognise2 ):
-            return Fibre.REGULAR
+            # TODO Can we make this more definitive?
+            return Fibre.UNKNOWN
 
         # We need to resort to searching for an annulus again. This time, we
         # are looking specifically for an annulus that cuts the other piece
@@ -208,7 +208,8 @@ def isFibre(edge):
                     onlySolidTori = False
                     break
             if onlySolidTori:
-                return Fibre.REGULAR
+                # Can we make this more definitive?
+                return Fibre.UNKNOWN
 
     # Surviving to this point means that the annulus we were looking for
     # doesn't exist.
