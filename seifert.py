@@ -46,8 +46,6 @@ def recogniseSFSOverDisc(tri):
     # non-unique Seifert fibration is "M/n2 x~ S1", which is homeomorphic to
     # "SFS [D: (2,1) (2,1)]".
     if sfs.name() == "M/n2 x~ S1":
-        # TODO
-        print( "            {}".format(sfs) )
         return SFS.DISCMOBIUS
     elif ( sfs.baseOrientable() and sfs.baseGenus() == 0 and
             sfs.punctures() == 1 ):
@@ -58,8 +56,6 @@ def recogniseSFSOverDisc(tri):
             # be fibred over the Mobius band.
             if ( sfs.fibre(0).alpha == 2 and sfs.fibre(0).beta == 1 and
                     sfs.fibre(1).alpha == 2 and sfs.fibre(1).beta == 1 ):
-                # TODO
-                print( "            {}".format(sfs) )
                 return SFS.DISCMOBIUS
             else:
                 return SFS.DISCTWO
@@ -112,48 +108,55 @@ def isFibre(edge):
                 classifications ) )
         c = classifications[0]
         if c is SFS.DISCMOBIUS:
-            # TODO Check this.
-            print( "        Combinatorial recognition says " +
-                    "DISCMOBIUS/EXCEPTIONAL." )
-            #return Fibre.EXCEPTIONAL
+            return Fibre.EXCEPTIONAL
         elif c is SFS.DISCTWO:
             # SFS over disc with 2 exceptional fibres. We must have drilled
             # out an exceptional fibre.
-            # TODO
-            print( "        Combinatorial recognition says " +
-                    "DISCTWO/EXCEPTIONAL." )
-            #return Fibre.EXCEPTIONAL
+            return Fibre.EXCEPTIONAL
         elif c is SFS.DISCTHREE:
             # SFS over disc with 3 exceptional fibres. We must have drilled
             # out a regular fibre.
-            # TODO
-            print( "        Combinatorial recognition says " +
-                    "DISCTHREE/REGULAR." )
-            #return Fibre.REGULAR
+            return Fibre.REGULAR
         elif c is SFS.NONDISC:
             # SFS, but not over the disc. We must have drilled out a curve
             # that is not isotopic to a Seifert fibre.
-            # TODO
-            print( "        Combinatorial recognition says " +
-                    "NONDISC/NONFIBRE." )
-            #return Fibre.NONFIBRE
+            return Fibre.NONFIBRE
         else:
             raise ValueError(
                     "Should never recognise something as {}.".format(c) )
 
     # Fast tests have failed us. Try looking at normal surfaces.
-    # TODO Experiment with vertex normal tori.
+    # Look for essential annuli. By Corollary 6.8 of "Algorithms for the
+    # complete decomposition of a closed 3-manifold" (Jaco and Tollefson,
+    # 1995), such annuli are guaranteed to appear either as a two-sided
+    # vertex normal surface or as the double of a one-sided vertex normal
+    # surface (the latter case is necessary because Jaco and Tollefson do not
+    # consider one-sided surfaces to be vertex surfaces).
     surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
     annuli = []
     for s in surfs:
-        if not s.isOrientable():
-            continue
         if not s.hasRealBoundary():
-            if s.eulerChar() != 0:
+            if not s.isOrientable() or s.eulerChar() != 0:
                 continue
+            # TODO Experiment with vertex normal tori.
             # We have a torus.
-            print( "            Torus: {}".format( s.detail()[:60] ) )
+#            print( "            Torus: {}".format( s.detail()[:60] ) )
+            continue
         euler = s.eulerChar()
+        if not s.isOrientable():
+            # The surface s is bounded and non-orientable. If it is a Mobius
+            # band, then we need to double it.
+            if euler != 0:
+                continue
+            doubleSurf = s.doubleSurface()
+            # We know for sure that doubleSurf has real boundary and has
+            # Euler characteristic 0. We just need to check that it is
+            # connected and orientable.
+            if doubleSurf.isOrientable() and doubleSurf.isConnected():
+                annuli.append(doubleSurf)
+            else:
+                raise ValueError( "Unexpected double of Mobius band." )
+            continue
         if euler == 1:
             # The surface s is a disc. Determine whether it is a compressing
             # disc by cutting along s and checking whether the torus boundary
@@ -191,8 +194,6 @@ def isFibre(edge):
         if cut.countComponents() != 2:
             # Cutting along a only yields one piece, so it isn't the annulus
             # we're looking for. Move along to the next annulus.
-            # TODO
-            print( "            Non-separating annulus." )
             continue
         notSolidTorus = []
         for comp in cut.triangulateComponents():
@@ -201,9 +202,6 @@ def isFibre(edge):
             if not comp.isSolidTorus():
                 notSolidTorus.append(comp)
         nonSolidTorusCount = len(notSolidTorus)
-        # TODO
-        print( "            NonSolidTorusCount: {}.".format(
-            nonSolidTorusCount ) )
         if nonSolidTorusCount == 0:
             return Fibre.EXCEPTIONAL
         elif nonSolidTorusCount == 2:
@@ -229,17 +227,11 @@ def isFibre(edge):
                             classifications ) )
             c = classifications[0]
             if c is SFS.DISCMOBIUS:
-                # TODO Check this.
-                print( "        After cutting, combinatorial recognition " +
-                        "says DISCMOBIUS/UNKNOWN." )
-                #return Fibre.UNKNOWN
+                return Fibre.UNKNOWN
             elif c is SFS.DISCTWO:
                 # SFS over disc with 2 exceptional fibres. We possibly cannot
                 # conclude anything.
-                # TODO
-                print( "        After cutting, combinatorial recognition " +
-                        "says DISCTWO/UNKNOWN." )
-                #return Fibre.UNKNOWN
+                return Fibre.UNKNOWN
             elif c is SFS.DISCTHREE:
                 # SFS over disc with 3 exceptional fibres.
                 # TODO I'm not sure what to do here.
@@ -258,9 +250,22 @@ def isFibre(edge):
         cutAnnuli = []
         hasCompress = False
         for s in cutSurfs:
-            if not s.isOrientable() or not s.hasRealBoundary():
+            if not s.hasRealBoundary():
                 continue
             euler = s.eulerChar()
+            if not s.isOrientable():
+                # The surface is bounded and non-orientable. If it is a
+                # Mobius band, then we need to double it.
+                if euler != 0:
+                    continue
+                doubleSurf = s.doubleSurface()
+                # We know for sure that doubleSurf has real boundary and has
+                # Euler characteristic 0. We just need to check that it is
+                # connected and orientable.
+                if doubleSurf.isOrientable() and doubleSurf.isConnected():
+                    cutAnnuli.append(doubleSurf)
+                else:
+                    raise ValueError( "Unexpected double of Mobius band." )
             if euler == 1:
                 # The surface s is a disc. Determine whether it is a
                 # compressing disc by cutting along s and checking whether
@@ -311,21 +316,21 @@ def isFibre(edge):
 if __name__ == "__main__":
     # Generate test triangulations.
     tests = [
-            ( "cPcbbbqxh", "SFS [S2: (2,1) (2,1) (2,-1)]" ) ]
-#            ( "cPcbbbqxh", "SFS [S2: (2,1) (2,1) (2,-1)]" ),
-#            ( "dLQbccchhrw", "SFS [S2: (2,1) (2,1) (3,-2)]" ),
-#            ( "eLAkbccddemken", "SFS [S2: (2,1) (2,1) (2,1)]" ),
-#            ( "eLAkbccddemkij", "SFS [S2: (2,1) (2,1) (3,-1)] : #1" ),
-#            ( "eLPkbcddddrwos", "SFS [S2: (2,1) (2,1) (3,-1)] : #2" ),
-#            ( "eLMkbcdddhhhqx", "SFS [S2: (2,1) (2,1) (4,-3)]" ),
+#            ( "cPcbbbqxh", "SFS [S2: (2,1) (2,1) (2,-1)]" ) ]
+            ( "cPcbbbqxh", "SFS [S2: (2,1) (2,1) (2,-1)]" ),
+            ( "dLQbccchhrw", "SFS [S2: (2,1) (2,1) (3,-2)]" ),
+            ( "eLAkbccddemken", "SFS [S2: (2,1) (2,1) (2,1)]" ),
+            ( "eLAkbccddemkij", "SFS [S2: (2,1) (2,1) (3,-1)] : #1" ),
+            ( "eLPkbcddddrwos", "SFS [S2: (2,1) (2,1) (3,-1)] : #2" ),
+            ( "eLMkbcdddhhhqx", "SFS [S2: (2,1) (2,1) (4,-3)]" ),
 #            ( "eLPkbcdddhrrnk", "SFS [S2: (2,1) (3,1) (3,-2)]" ) ]
-#            ( "eLPkbcdddhrrnk", "SFS [S2: (2,1) (3,1) (3,-2)]" ),
-#            ( "fLLQcaceeedjkuxkn", "SFS [S2: (2,1) (3,1) (3,-1)] : #1" ),
-#            ( "fLLQcbeddeehhokum", "SFS [S2: (2,1) (3,1) (3,-1)] : #2" ),
-#            ( "fLLQcbeddeehhnkxx", "SFS [S2: (2,1) (3,1) (4,-3)] : #1" ),
-#            ( "fvPQcceddeerrnskr", "SFS [S2: (2,1) (3,1) (4,-3)] : #2" ),
-#            ( "fvPQcdecedekrsnrs", "SFS [S2: (2,1) (3,1) (5,-4)]" ),
-#            ( "fLLQcaceeedjkuxkj", "SFS [S2: (2,1) (3,2) (3,-1)]" ) ]
+            ( "eLPkbcdddhrrnk", "SFS [S2: (2,1) (3,1) (3,-2)]" ),
+            ( "fLLQcaceeedjkuxkn", "SFS [S2: (2,1) (3,1) (3,-1)] : #1" ),
+            ( "fLLQcbeddeehhokum", "SFS [S2: (2,1) (3,1) (3,-1)] : #2" ),
+            ( "fLLQcbeddeehhnkxx", "SFS [S2: (2,1) (3,1) (4,-3)] : #1" ),
+            ( "fvPQcceddeerrnskr", "SFS [S2: (2,1) (3,1) (4,-3)] : #2" ),
+            ( "fvPQcdecedekrsnrs", "SFS [S2: (2,1) (3,1) (5,-4)]" ),
+            ( "fLLQcaceeedjkuxkj", "SFS [S2: (2,1) (3,2) (3,-1)]" ) ]
     def genEdges(sig):
         tri = Triangulation3.fromIsoSig(sig)
         # What are the edges currently in the triangulation?
@@ -382,17 +387,16 @@ if __name__ == "__main__":
                 else:
                     print( msg.format( fibreType.name ) )
         print()
-        # TODO Reinstate this later.
-#        height = 0
-#        sigSet = {sig}
-#        newNonFibres = 0
-#        maxHeight = 4
-#        maxSize = 12
-#        while height < maxHeight and len(sigSet) < maxSize:
-#            height += 1
-#            foundNew, sigSet = findNonFibres(sigSet)
-#            if foundNew:
-#                newNonFibres += 1
-#            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
-#                height, len(sigSet), newNonFibres ) )
+        height = 0
+        sigSet = {sig}
+        newNonFibres = 0
+        maxHeight = 4
+        maxSize = 12
+        while height < maxHeight and len(sigSet) < maxSize:
+            height += 1
+            foundNew, sigSet = findNonFibres(sigSet)
+            if foundNew:
+                newNonFibres += 1
+            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
+                height, len(sigSet), newNonFibres ) )
 
