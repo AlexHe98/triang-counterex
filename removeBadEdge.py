@@ -28,6 +28,19 @@ from triangCounterexHelpers import relabelEdges
 
 
 def complexity( tri, badEdges ):
+    """
+    Returns a measure for how far away we are from removing the given
+    collection of bad edges from the given triangulation.
+
+    The returned complexity is a tuple consisting of the following items:
+    (0) The number of bad edges (i.e., the length of the given collection of
+        bad edge indices).
+    (1) The maximum "multiplicity defect" among the given bad edges (see the
+        mulDefect() routine).
+    (2) The maximum "degree defect" among the given bad edges (see the
+        degDefect() routine).
+    (3) The number of tetrahedra in the given triangulation.
+    """
     mulDefs = [ mulDefect( tri.edge(i) ) for i in badEdges ]
     degDefs = [ degDefect( tri.edge(i) ) for i in badEdges ]
     mulDefs.append(0)
@@ -43,7 +56,7 @@ class RemoveBadEdgeData:
     Stores all the data that needs to be shared between processes when
     running the removeBadEdge() routine.
     """
-    def __init__( self, s, nProcesses, interval, isBad ):
+    def __init__( self, s, nProcesses, interval, isBad, excess ):
         """
         Initialises shared search data.
 
@@ -57,10 +70,6 @@ class RemoveBadEdgeData:
         # Number of processes currently running.
         self._nRunning = nProcesses
 
-        # We can stop the computation as soon as we find a result.
-        self._stop = False
-        self._results = []
-
         # Details of all discovered isomorphism signatures.
         self._total = 0
         self._explored = 0
@@ -71,6 +80,12 @@ class RemoveBadEdgeData:
         t = Triangulation3.fromIsoSig(s)
         b = [ e.index() for e in t.edges() if isBad(e) ]
         c = complexity( t, b )
+
+        # We can stop the computation as soon as we find a result.
+        self._stop = False
+        self._target = c[0]
+        self._maxBadEdges = self._target + excess
+        self._results = []
 
         # Share isBad routine with all processes.
         self._isBad = isBad
@@ -131,6 +146,18 @@ class RemoveBadEdgeData:
     def _updateMinSig( self, sig, priority ):
         if priority < self._minComplexity():
             self._minSig = sig
+
+    def target(self):
+        """
+        Returns the target number of bad edges that we need to get below.
+        """
+        return self._target
+
+    def maxBadEdges(self):
+        """
+        Returns the maximum allowed number of bad edges.
+        """
+        return self._maxBadEdges
 
     def getResults(self):
         """
@@ -228,8 +255,54 @@ class RemoveBadEdgeManager(SyncManager):
 RemoveBadEdgeManager.register( "RemoveBadEdgeData", RemoveBadEdgeData )
 
 
+def removeBadEdgeGreedy(
+        tri, sig, priority, source, badEdges, target, shared, lock, cond ):
+    for i in badEdges:
+        result = threeTwo( tri.edge(i) )
+        if result is None:
+            continue
+
+        # We successfully removed a bad edge!
+        newTri, newTrans = result
+        newSig, newIsom = newTri.isoSigDetail()
+        with lock:
+            if shared.alreadySeen(newSig):
+                continue
+
+        # We haven't seen newSig before. Did we get below the target?
+        newBadEdges = [ newTrans[j] for j in badEdges if j != i ]
+        newPriority = complexity( newTri, newBadEdges )
+        newSource = ( source[0] + 1,
+                ( "3-2", i ),
+                priority,
+                sig )
+        relBadEdges = tuple( relabelEdges( newTri, newBadEdges, newIsom ) )
+        if priority[0] == target:
+            # We started at the target, so removing a bad edge gets us below!
+            with lock:
+                shared.newResult(
+                        newSig, newPriority, relBadEdges, newSource )
+            return True
+
+        # We didn't get below the target, so we should continue trying to
+        # remove bad edges.
+        with lock:
+            if shared.queueEmpty():
+                shared.enqueue(
+                        newSig, newPriority, relBadEdges, newSource )
+                cond.notify_all()
+            else:
+                shared.enqueue(
+                        newSig, newPriority, relBadEdges, newSource )
+        newIsom.applyInPlace(newTri)
+        if removeBadEdgeGreedy( newTri, newSig, newPriority, newSource,
+                relBadEdges, target, shared, lock, cond ):
+            return True
+    return False
+
+
 def removeBadEdgeExplore(
-        sig, oldPriority, oldSource, shared, lock, cond ):
+        sig, priority, source, shared, lock, cond ):
     # NOTES
     """
     --- Many of the computations can be done independently of other
@@ -240,91 +313,63 @@ def removeBadEdgeExplore(
     tetCount = tri.size()
     with lock:
         badEdges = shared.badEdges(sig)
+        target = shared.target()
 
     # If one of the bad edges could be removed, then we would already have
-    # done so. Thus, we only need to try to remove *good* (i.e., non-bad)
-    # edges using 3-2 moves.
+    # done so. Thus, we only need to try to remove *good* edges.
     for edge in tri.edges():
         if edge.index() in badEdges:
             continue
         result = threeTwo(edge)
         if result is None:
             continue
-        newTri, transition = result
-        newSig, isom = newTri.isoSigDetail()
+        newTri, newTrans = result
+        newSig, newIsom = newTri.isoSigDetail()
 
-        # Have we already seen newSig?
+        # If newSig is genuinely new, then we should enqueue it.
         with lock:
             if shared.alreadySeen(newSig):
                 continue
-
-        # Priority and source.
-        newBadEdges = [ transition[i] for i in badEdges ]
-        priority = complexity( newTri, newBadEdges )
-        if oldSource is None:
+        newBadEdges = [ newTrans[i] for i in badEdges ]
+        newPriority = complexity( newTri, newBadEdges )
+        if source is None:
             steps = 1
         else:
-            steps = oldSource[0] + 1
+            steps = source[0] + 1
         newSource = ( steps,
                 ( "3-2", edge.index() ),
-                oldPriority,
+                priority,
                 sig )
-
-        # We now know that newSig is genuinely new. Check whether we can
-        # remove any bad edges using a 3-2 moves.
         relBadEdges = tuple( relabelEdges(
-            newTri, newBadEdges, isom ) )
-        isom.applyInPlace(newTri)
-        foundResult = False
-        for i in relBadEdges:
-            result = threeTwo( newTri.edge(i) )
-            if result is None:
-                continue
-
-            # We have found a result!
-            outTri, outTrans = result
-            outSig, outIsom = outTri.isoSigDetail()
-            outBadEdges = [ outTrans[j] for j in relBadEdges ]
-            outBadEdges.remove(-1)
-            outPriority = complexity( outTri, outBadEdges )
-            outSource = ( newSource[0] + 1,
-                    ( "3-2", i ),
-                    priority,
-                    newSig )
-            relOutBadEdges = tuple( relabelEdges(
-                outTri, outBadEdges, outIsom ) )
-            with lock:
-                if shared.alreadySeen(outSig):
-                    continue
-                shared.enqueue(
-                        newSig, priority, relBadEdges, newSource )
-                shared.newResult(
-                        outSig, outPriority, relOutBadEdges, outSource )
-            foundResult = True
-        if foundResult:
-            return
-
-        # No new result yet, so we need to enqueue newSig.
-        # If shared.queueEmpty(), then don't forget to notify any paused
-        # processes to resume.
+            newTri, newBadEdges, newIsom ) )
         with lock:
             if shared.queueEmpty():
                 shared.enqueue(
-                        newSig, priority, relBadEdges, newSource )
+                        newSig, newPriority, relBadEdges, newSource )
                 cond.notify_all()
             else:
                 shared.enqueue(
-                        newSig, priority, relBadEdges, newSource )
+                        newSig, newPriority, relBadEdges, newSource )
 
-    # Now try all 2-3 moves that introduce a good edge.
+        # Can we remove bad edges?
+        newIsom.applyInPlace(newTri)
+        if removeBadEdgeGreedy( newTri, newSig, newPriority, newSource,
+                relBadEdges, target, shared, lock, cond ):
+            # Terminate immediately if we found a result.
+            return
+
+    # Now try all 2-3 moves, as long as they don't take us beyond the maximum
+    # allowed number of bad edges.
     with lock:
+        maxBadEdges = shared.maxBadEdges()
         isBad = shared.getIsBadRoutine()
+    ignore = ( priority[0] == maxBadEdges )
     for triangle in tri.triangles():
         result = twoThree(triangle)
         if result is None:
             continue
-        newTri, transition = result
-        newSig, isom = newTri.isoSigDetail()
+        newTri, newTrans = result
+        newSig, newIsom = newTri.isoSigDetail()
 
         # Have we already seen newSig?
         with lock:
@@ -332,69 +377,41 @@ def removeBadEdgeExplore(
                 continue
 
         # Did we introduce a bad edge?
-        # This computation could potentially be very expensive, so we should
-        # make sure to parallelise.
-        newEdge = newTri.edge( transition[-1] )
-        if isBad(newEdge):
+        newEdge = newTri.edge( newTrans[-1] )
+        newEdgeIsBad = isBad(newEdge)
+        if ignore and newEdgeIsBad:
             continue
 
-        # Priority and source.
-        newBadEdges = [ transition[i] for i in badEdges ]
-        priority = complexity( newTri, newBadEdges )
-        if oldSource is None:
+        # We should enqueue the newSig.
+        newBadEdges = [ newTrans[i] for i in badEdges ]
+        if newEdgeIsBad:
+            newBadEdges.append( newTrans[-1] )
+        newPriority = complexity( newTri, newBadEdges )
+        if source is None:
             steps = 1
         else:
-            steps = oldSource[0] + 1
+            steps = source[0] + 1
         newSource = ( steps,
                 ( "2-3", triangle.index() ),
-                oldPriority,
+                priority,
                 sig )
-
-        # We now know that newSig is genuinely new, and that the newly
-        # introduced edge is good. Check whether we can remove any bad edges
-        # using a 3-2 move.
         relBadEdges = tuple( relabelEdges(
-            newTri, newBadEdges, isom ) )
-        isom.applyInPlace(newTri)
-        foundResult = False
-        for i in relBadEdges:
-            result = threeTwo( newTri.edge(i) )
-            if result is None:
-                continue
-
-            # We have found a new result!
-            outTri, outTrans = result
-            outSig, outIsom = outTri.isoSigDetail()
-            outBadEdges = [ outTrans[j] for j in relBadEdges ]
-            outBadEdges.remove(-1)
-            outPriority = complexity( outTri, outBadEdges )
-            outSource = ( newSource[0] + 1,
-                    ( "3-2", i ),
-                    priority,
-                    newSig )
-            relOutBadEdges = tuple( relabelEdges(
-                outTri, outBadEdges, outIsom ) )
-            with lock:
-                if shared.alreadySeen(outSig):
-                    continue
-                shared.enqueue(
-                        newSig, priority, relBadEdges, newSource )
-                shared.newResult(
-                        outSig, outPriority, relOutBadEdges, outSource )
-        if foundResult:
-            return
-
-        # No new result yet, so we need to enqueue newSig.
-        # If shared.queueEmpty(), then don't forget to notify any paused
-        # processes to resume.
+            newTri, newBadEdges, newIsom ) )
         with lock:
             if shared.queueEmpty():
                 shared.enqueue(
-                        newSig, priority, relBadEdges, newSource )
+                        newSig, newPriority, relBadEdges, newSource )
                 cond.notify_all()
             else:
                 shared.enqueue(
-                        newSig, priority, relBadEdges, newSource )
+                        newSig, newPriority, relBadEdges, newSource )
+
+        # Can we remove bad edges?
+        newIsom.applyInPlace(newTri)
+        if removeBadEdgeGreedy( newTri, newSig, newPriority, newSource,
+                relBadEdges, target, shared, lock, cond ):
+            # Terminate immediately if we found a result:
+            return
 
 
 def removeBadEdgeLoop( shared, lock, cond ):
@@ -460,15 +477,17 @@ def removeBadEdgeLoop( shared, lock, cond ):
         removeBadEdgeExplore( sig, priority, source, shared, lock, cond )
 
 
-def removeBadEdge( s, nProcesses, interval, isBad, badName ):
+def removeBadEdge( s, nProcesses, interval, isBad, badName, excess=0 ):
     """
     Starting at the given isomorphism signature s, and using the given number
-    of parallel processes, searches for a 3-2 move that removes a bad edge
-    from s, where we consider an edge e to be bad if and only if isBad(e)
-    returns True.
+    of parallel processes, searches for a 3-2 move that reduces the number of
+    bad edges in s, where we consider an edge e to be bad if and only if
+    isBad(e) returns True.
 
     The search abides by the following constraints:
-    (1) Any 2-3 moves that introduce bad edges are ignored.
+    (1) If the initial isomorphism signature s corresponds to a triangulation
+        with b bad edges, then we ignore any 2-3 moves that cause the number
+        of bad edges to exceed b by more than the given excess.
     (2) Priority is given to triangulations in which the maximum
         "multiplicity defect" (see the mulDefect() routine) among bad edges
         is small, then to triangulations in which the maximum "degree defect"
@@ -477,16 +496,17 @@ def removeBadEdge( s, nProcesses, interval, isBad, badName ):
     (3) Triangulations with equal priority are processed in order of
         insertion.
 
-    If the search successfully finds one or more 3-2 moves that remove a bad
-    edge, then returns a list containing the isomorphism signatures of the
-    triangulations that result from performing these moves (it is possible
-    for multiple parallel processes to each find such a move at roughly the
-    same time, in which case the returned list will contain more than one
-    isomorphism signature).
+    If the search successfully finds one or more 3-2 moves that reduce the
+    number of bad edges, then this routine returns a list containing the
+    isomorphism signatures of the triangulations that result from performing
+    these moves (it is possible for multiple parallel processes to each find
+    such a move at roughly the same time, in which case the returned list
+    will contain more than one isomorphism signature).
 
     It is also possible for the search to "get stuck" in a situation where
-    the only moves available are 2-3 moves that introduced bad edges (which
-    we ignore). In this case, returns an empty list.
+    the only moves available are 2-3 moves increase the number of bad edges
+    beyond the allowed excess. Since we ignore all such moves, this routine
+    returns an empty list whenever we get stuck in this way.
 
     Note: When run with multiple processes (i.e., nProcesses > 1), this
     routine is not completely deterministic because insertion order may vary
@@ -497,12 +517,17 @@ def removeBadEdge( s, nProcesses, interval, isBad, badName ):
 
     Pre-condition:
     --- The triangulation represented by s has at least one bad edge.
+    --- The function isBad takes a single edge e as input, and outputs either
+        True or False (corresponding to whether the edge e should be
+        considered bad).
+    --- The given excess is a non-negative integer.
     """
     manager = RemoveBadEdgeManager()
     manager.start()
     lock = manager.Lock()
     cond = manager.Condition(lock)
-    shared = manager.RemoveBadEdgeData( s, nProcesses, interval, isBad )
+    shared = manager.RemoveBadEdgeData(
+            s, nProcesses, interval, isBad, excess )
     processes = [
             Process( target=removeBadEdgeLoop, args=( shared, lock, cond ) )
             for _ in range(nProcesses) ]
