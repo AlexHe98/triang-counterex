@@ -17,22 +17,37 @@ class Fibre(Enum):
     REGULAR = auto()        # Curve that is a regular fibre.
 
 
+# TODO Include Mobius band base.
 class SFS(Enum):
     UNKNOWN = auto()    # Unknown whether SFS or not.
     NOTSFS = auto()     # Not an SFS.
-    NONDISC = auto()    # SFS, but not over disc.
+    OTHERSFS = auto()   # SFS, but not one of the types listed below.
+    MOBIUSONE = auto()  # SFS over Mobius band, class bn2; 1 exceptional fibre.
     DISCMOBIUS = auto() # SFS over disc that also fibres over Mobius band.
-    DISCTWO = auto()    # SFS over disc; 2 exceptional fibres.
-    DISCTHREE = auto()  # SFS over disc; 3 exceptional fibres.
-    DISCOTHER = auto()  # SFS over disc; neither 2 nor 3 exceptional fibres.
+    DISCTWO = auto()    # SFS over disc, class bo1; 2 exceptional fibres.
+    DISCTHREE = auto()  # SFS over disc, class bo1; 3 exceptional fibres.
 
 
-def recogniseSFSOverDisc(tri):
+# TODO Include Mobius band base.
+def recogniseSFS(tri):
     """
-    Is the given triangulation a Seifert fibre space over the disc?
+    Uses combinatorial recognition to determine whether the given
+    triangulation is a Seifert fibre space, and if so classify it into one of
+    a number of "interesting" types of Seifert fibre space.
 
-    If tri is recognised as a Seifert fibre space, then this routine will
-    conclusively determine whether it has a Seifert fibration over the disc.
+    See the enumeration SFS for the list of all possible classifications. We
+    currently consider the following types of Seifert fibre space to be
+    "interesting":
+    --> Seifert fibre spaces of class bo1 over the disc, with two
+        exceptional fibres;
+    --> Seifert fibre spaces of class bo1 over the disc with three
+        exceptional fibres; and
+    --> Seifert fibre spaces of class bn2 over the Mobius band with one
+        exceptional fibre.
+    Note that there is exactly one Seifert fibre space over the disc that
+    also fibres over the Mobius band; this has class bo1 and two exceptional
+    fibres over the disc, and has class bn2 and no exceptional fibres over
+    the Mobius band.
 
     This routine relies exclusively on combinatorial recognition, so it will
     never be able to prove that tri is not a Seifert fibre space (i.e., it
@@ -42,30 +57,33 @@ def recogniseSFSOverDisc(tri):
     if blocked is None:
         return SFS.UNKNOWN
     sfs = blocked.manifold()
-    # Apart from fibred solid tori, the only bounded Seifert fibre space with
-    # non-unique Seifert fibration is "M/n2 x~ S1", which is homeomorphic to
-    # "SFS [D: (2,1) (2,1)]".
-    if sfs.name() == "M/n2 x~ S1":
-        return SFS.DISCMOBIUS
-    elif ( sfs.baseOrientable() and sfs.baseGenus() == 0 and
-            sfs.punctures() == 1 ):
-        # Base is a disc.
-        fc = sfs.fibreCount()
-        if fc == 2:
-            # If both exceptional fibres are (2,1) fibres, then we can also
-            # be fibred over the Mobius band.
+    if sfs.punctures() != 1:
+        # Definitely not fibred over the disc or the Mobius band.
+        return SFS.OTHERSFS
+    if sfs.baseClass() == SFSpace.bo1 and sfs.baseGenus() == 0:
+        # Fibred over disc, class bo1.
+        if sfs.fibreCount() == 2:
+            # When we have two exceptional fibres, we could also be fibred
+            # over the Mobius band.
             if ( sfs.fibre(0).alpha == 2 and sfs.fibre(0).beta == 1 and
                     sfs.fibre(1).alpha == 2 and sfs.fibre(1).beta == 1 ):
                 return SFS.DISCMOBIUS
             else:
                 return SFS.DISCTWO
-        elif fc == 3:
+        elif sfs.fibreCount() == 3:
             return SFS.DISCTHREE
         else:
-            return SFS.DISCOTHER
+            return SFS.OTHERSFS
+    elif sfs.baseClass() == SFSpace.bn2 and sfs.baseGenus() == 1:
+        # Fibred over Mobius band, class bn2.
+        if sfs.fibreCount() == 0:
+            return SFS.DISCMOBIUS
+        elif sfs.fibreCount() == 1:
+            return SFS.MOBIUSONE
+        else:
+            return SFS.OTHERSFS
     else:
-        # We have a blocked Seifert fibre space whose base is not a disc.
-        return SFS.NONDISC
+        return SFS.OTHERSFS
 
 
 def isFibre(edge):
@@ -86,44 +104,44 @@ def isFibre(edge):
     drilled.idealToFinite()
     drilled.intelligentSimplify()
     drilled.intelligentSimplify()
+    # Retriangulate with height 0 (single-threaded), and see if we can ever
+    # recognise the drilled triangulation as a Seifert fibre space.
     classifications = []
     def recognise( sig, tri ):
-        c = recogniseSFSOverDisc(tri)
+        c = recogniseSFS(tri)
         if c is SFS.UNKNOWN:
             # We don't know if we have a Seifert fibre space.
             return False
-        # Since recogniseSFSOverDisc() can never prove that something is not
-        # a Seifert fibre space, we now know that this tri is definitely a
-        # Seifert fibre space.
+        elif c is SFS.NOTSFS:
+            # Combinatorial recognition should never be able to prove that
+            # tri is not a Seifert fibre space.
+            raise ValueError( "Recognised {}".format(c) )
+        # We definitely have a Seifert fibre space.
         classifications.append(c)
         return True
-    height = 0
-    nThreads = 1
-    if drilled.retriangulate( height, nThreads, recognise ):
+    # TODO Test.
+    cr = None
+    if drilled.retriangulate( 0, 1, recognise ):
         # The drilled triangulation is definitely a Seifert fibre space.
-        # Moreover, we know that if the drilled triangulation has a Seifert
-        # fibration over the disc, then we will have recognised this.
         if len(classifications) != 1:
             raise ValueError( "Wrong number of classifications: {}".format(
                 classifications ) )
         c = classifications[0]
-        if c is SFS.DISCMOBIUS:
-            return Fibre.EXCEPTIONAL
-        elif c is SFS.DISCTWO:
-            # SFS over disc with 2 exceptional fibres. We must have drilled
-            # out an exceptional fibre.
-            return Fibre.EXCEPTIONAL
-        elif c is SFS.DISCTHREE:
-            # SFS over disc with 3 exceptional fibres. We must have drilled
-            # out a regular fibre.
-            return Fibre.REGULAR
-        elif c is SFS.NONDISC:
-            # SFS, but not over the disc. We must have drilled out a curve
-            # that is not isotopic to a Seifert fibre.
-            return Fibre.NONFIBRE
+        if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
+            # TODO Test.
+            cr = Fibre.EXCEPTIONAL
+            #return Fibre.EXCEPTIONAL
+        elif ( c is SFS.DISCTHREE ) or ( c is SFS.MOBIUSONE ):
+            # TODO Test.
+            cr = Fibre.REGULAR
+            #return Fibre.EXCEPTIONAL
+        elif c is SFS.OTHERSFS:
+            # TODO Test.
+            cr = Fibre.NONFIBRE
+            #return Fibre.NONFIBRE
         else:
             raise ValueError(
-                    "Should never recognise something as {}.".format(c) )
+                    "Should never recognise something as {}".format(c) )
 
     # Fast tests have failed us. Try looking at normal surfaces.
     # Look for essential annuli. By Corollary 6.8 of "Algorithms for the
@@ -166,16 +184,16 @@ def isFibre(edge):
             compress.intelligentSimplify()
             if ( compress.countBoundaryComponents() == 1 and
                     compress.boundaryComponent(0).eulerChar() == 2 ):
-                # TODO
-                print( "        Compressing disc!" )
+                # TODO Test.
+                print( "        Compressing disc! CR: {}".format(cr) )
                 return Fibre.NONFIBRE
         elif euler == 0:
             annuli.append(s)
     if not annuli:
         # The drilled triangulation has no essential annuli, so we cannot
         # have drilled out a Seifert fibre.
-        # TODO
-        print( "        No annuli!" )
+        # TODO Test.
+        print( "        No annuli! CR: {}".format(cr) )
         return Fibre.NONFIBRE
     # We are looking for an annulus that either:
     #   --> cuts the drilled triangulation into two solid tori (in which case
@@ -203,6 +221,8 @@ def isFibre(edge):
                 notSolidTorus.append(comp)
         nonSolidTorusCount = len(notSolidTorus)
         if nonSolidTorusCount == 0:
+            # TODO Test.
+            print( "        CR: {}".format(cr) )
             return Fibre.EXCEPTIONAL
         elif nonSolidTorusCount == 2:
             # Cutting along a doesn't yield any solid torus pieces, so it
@@ -211,38 +231,31 @@ def isFibre(edge):
 
         # Getting to this point means that cutting along a yields two pieces,
         # exactly one of which is a solid torus. Is the other piece a Seifert
-        # fibre space over the disc with 2 exceptional fibres? First try to
-        # answer this using combinatorial recognition.
+        # fibre space over the disc with 2 exceptional fibres?
         other = notSolidTorus[0]
+        # Retriangulate with height 0 (single-threaded), and see if we can
+        # recognise the other piece as a Seifert fibre space.
         classifications = []
-        height = 0
-        nThreads = 1
-        if other.retriangulate( height, nThreads, recognise ):
-            # The other piece is definitely a Seifert fibre space. Moreover,
-            # we know that if the other piece has a Seifert fibration over
-            # the disc, then we will have recognised this.
+        if other.retriangulate( 0, 1, recognise ):
+            # The other piece is definitely a Seifert fibre space.
             if len(classifications) != 1:
                 raise ValueError(
                         "Wrong number of classifications: {}".format(
                             classifications ) )
             c = classifications[0]
-            if c is SFS.DISCMOBIUS:
+            if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
+                # TODO Test.
+                print( "        CR: {}".format(cr) )
                 return Fibre.UNKNOWN
-            elif c is SFS.DISCTWO:
-                # SFS over disc with 2 exceptional fibres. We possibly cannot
-                # conclude anything.
-                return Fibre.UNKNOWN
-            elif c is SFS.DISCTHREE:
-                # SFS over disc with 3 exceptional fibres.
+            elif ( c is SFS.DISCTHREE ) or ( c is SFS.MOBIUSONE ):
                 # TODO I'm not sure what to do here.
                 pass
-            elif c is SFS.NONDISC:
-                # SFS, but not over the disc.
+            elif c is SFS.OTHERSFS:
                 # TODO I'm not sure what to do here.
                 pass
             else:
                 raise ValueError(
-                        "Should never recognise something as {} {}.".format(
+                        "Should never recognise something as {} {}".format(
                             c, "after cutting" ) )
 
         # Now try looking at normal surfaces in the other triangulation.
@@ -303,12 +316,14 @@ def isFibre(edge):
                     break
             if onlySolidTori:
                 # TODO We possibly cannot say anything more definitive.
+                # TODO Test.
+                print( "        CR: {}".format(cr) )
                 return Fibre.UNKNOWN
 
     # Surviving to this point means that the annulus we were looking for
     # doesn't exist.
     # TODO
-    print( "        Survived cutting!" )
+    print( "        Survived cutting! CR: {}".format(cr) )
     return Fibre.NONFIBRE
 
 
@@ -386,17 +401,18 @@ if __name__ == "__main__":
                     print( msg.format( fibreType.name + "   <--" ) )
                 else:
                     print( msg.format( fibreType.name ) )
-        print()
-        height = 0
-        sigSet = {sig}
-        newNonFibres = 0
-        maxHeight = 4
-        maxSize = 12
-        while height < maxHeight and len(sigSet) < maxSize:
-            height += 1
-            foundNew, sigSet = findNonFibres(sigSet)
-            if foundNew:
-                newNonFibres += 1
-            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
-                height, len(sigSet), newNonFibres ) )
+        # TODO Reinstate later.
+#        print()
+#        height = 0
+#        sigSet = {sig}
+#        newNonFibres = 0
+#        maxHeight = 4
+#        maxSize = 12
+#        while height < maxHeight and len(sigSet) < maxSize:
+#            height += 1
+#            foundNew, sigSet = findNonFibres(sigSet)
+#            if foundNew:
+#                newNonFibres += 1
+#            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
+#                height, len(sigSet), newNonFibres ) )
 
