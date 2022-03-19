@@ -119,8 +119,6 @@ def isFibre(edge):
         # We definitely have a Seifert fibre space.
         classifications.append(c)
         return True
-    # TODO Test.
-    cr = None
     if drilled.retriangulate( 0, 1, recognise ):
         # The drilled triangulation is definitely a Seifert fibre space.
         if len(classifications) != 1:
@@ -128,17 +126,11 @@ def isFibre(edge):
                 classifications ) )
         c = classifications[0]
         if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
-            # TODO Test.
-            cr = Fibre.EXCEPTIONAL
-            #return Fibre.EXCEPTIONAL
+            return Fibre.EXCEPTIONAL
         elif ( c is SFS.DISCTHREE ) or ( c is SFS.MOBIUSONE ):
-            # TODO Test.
-            cr = Fibre.REGULAR
-            #return Fibre.EXCEPTIONAL
+            return Fibre.REGULAR
         elif c is SFS.OTHERSFS:
-            # TODO Test.
-            cr = Fibre.NONFIBRE
-            #return Fibre.NONFIBRE
+            return Fibre.NONFIBRE
         else:
             raise ValueError(
                     "Should never recognise something as {}".format(c) )
@@ -185,7 +177,7 @@ def isFibre(edge):
             if ( compress.countBoundaryComponents() == 1 and
                     compress.boundaryComponent(0).eulerChar() == 2 ):
                 # TODO Test.
-                print( "        Compressing disc! CR: {}".format(cr) )
+                print( "        Compressing disc!" )
                 return Fibre.NONFIBRE
         elif euler == 0:
             annuli.append(s)
@@ -193,7 +185,7 @@ def isFibre(edge):
         # The drilled triangulation has no essential annuli, so we cannot
         # have drilled out a Seifert fibre.
         # TODO Test.
-        print( "        No annuli! CR: {}".format(cr) )
+        print( "        No annuli!" )
         return Fibre.NONFIBRE
     # We are looking for an annulus that either:
     #   --> cuts the drilled triangulation into two solid tori (in which case
@@ -204,6 +196,7 @@ def isFibre(edge):
     #       Seifert fibre).
     # If we never find such an annulus, then we definitely did not drill out
     # a Seifert fibre.
+    otherPieces = []
     for a in annuli:
         # Try cutting along the annulus a. If this causes the drilled
         # triangulation to fall apart into two solid tori, then we know that
@@ -221,8 +214,6 @@ def isFibre(edge):
                 notSolidTorus.append(comp)
         nonSolidTorusCount = len(notSolidTorus)
         if nonSolidTorusCount == 0:
-            # TODO Test.
-            print( "        CR: {}".format(cr) )
             return Fibre.EXCEPTIONAL
         elif nonSolidTorusCount == 2:
             # Cutting along a doesn't yield any solid torus pieces, so it
@@ -230,35 +221,41 @@ def isFibre(edge):
             continue
 
         # Getting to this point means that cutting along a yields two pieces,
-        # exactly one of which is a solid torus. Is the other piece a Seifert
-        # fibre space over the disc with 2 exceptional fibres?
-        other = notSolidTorus[0]
+        # exactly one of which is a solid torus. Deal with the other piece
+        # later.
+        otherPieces.append( notSolidTorus[0] )
+
+    # We definitely didn't drill out an exceptional fibre. Did we perhaps
+    # drill out a regular fibre instead?
+    for other in otherPieces:
         # Retriangulate with height 0 (single-threaded), and see if we can
-        # recognise the other piece as a Seifert fibre space.
+        # recognise this other piece as a Seifert fibre space.
         classifications = []
         if other.retriangulate( 0, 1, recognise ):
-            # The other piece is definitely a Seifert fibre space.
+            # This other piece is definitely a Seifert fibre space.
             if len(classifications) != 1:
                 raise ValueError(
                         "Wrong number of classifications: {}".format(
                             classifications ) )
             c = classifications[0]
             if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
-                # TODO Test.
-                print( "        CR: {}".format(cr) )
+                # We cannot say anything definitive without doing more work.
                 return Fibre.UNKNOWN
             elif ( c is SFS.DISCTHREE ) or ( c is SFS.MOBIUSONE ):
-                # TODO I'm not sure what to do here.
-                pass
+                # We must have drilled out a regular fibre and then cut along
+                # a boundary-parallel annulus.
+                # TODO Check this.
+                return Fibre.REGULAR
             elif c is SFS.OTHERSFS:
-                # TODO I'm not sure what to do here.
-                pass
+                # We cannot get this if we drilled out a Seifert fibre.
+                # TODO Check this.
+                return Fibre.NONFIBRE
             else:
                 raise ValueError(
                         "Should never recognise something as {} {}".format(
                             c, "after cutting" ) )
 
-        # Now try looking at normal surfaces in the other triangulation.
+        # Now try looking at normal surfaces in this other piece.
         cutSurfs = NormalSurfaces.enumerate( other, NS_STANDARD )
         cutAnnuli = []
         hasCompress = False
@@ -315,15 +312,12 @@ def isFibre(edge):
                     onlySolidTori = False
                     break
             if onlySolidTori:
-                # TODO We possibly cannot say anything more definitive.
-                # TODO Test.
-                print( "        CR: {}".format(cr) )
+                # We cannot say anything definitive without doing more work.
                 return Fibre.UNKNOWN
 
     # Surviving to this point means that the annulus we were looking for
     # doesn't exist.
-    # TODO
-    print( "        Survived cutting! CR: {}".format(cr) )
+    print( "        Survived cutting!" )
     return Fibre.NONFIBRE
 
 
@@ -401,18 +395,17 @@ if __name__ == "__main__":
                     print( msg.format( fibreType.name + "   <--" ) )
                 else:
                     print( msg.format( fibreType.name ) )
-        # TODO Reinstate later.
-#        print()
-#        height = 0
-#        sigSet = {sig}
-#        newNonFibres = 0
-#        maxHeight = 4
-#        maxSize = 12
-#        while height < maxHeight and len(sigSet) < maxSize:
-#            height += 1
-#            foundNew, sigSet = findNonFibres(sigSet)
-#            if foundNew:
-#                newNonFibres += 1
-#            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
-#                height, len(sigSet), newNonFibres ) )
+        print()
+        height = 0
+        sigSet = {sig}
+        newNonFibres = 0
+        maxHeight = 4
+        maxSize = 15
+        while height < maxHeight and len(sigSet) < maxSize:
+            height += 1
+            foundNew, sigSet = findNonFibres(sigSet)
+            if foundNew:
+                newNonFibres += 1
+            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
+                height, len(sigSet), newNonFibres ) )
 
