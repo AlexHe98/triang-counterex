@@ -76,10 +76,11 @@ class RemoveBadEdgeData:
         self._details = dict()
 
         # Initial triangulation.
-        self._minSig = s
         t = Triangulation3.fromIsoSig(s)
         b = [ e.index() for e in t.edges() if isBad(e) ]
         c = complexity( t, b )
+        self._minSig = { c[0]: s }
+        self._current = s
 
         # We can stop the computation as soon as we find a result.
         self._stop = False
@@ -110,8 +111,8 @@ class RemoveBadEdgeData:
         """
         return self._isBad
 
-    def _minComplexity(self):
-        return self._details[ self._minSig ][2]
+    def _minComplexity( self, badEdgeCount ):
+        return self._details[ self._minSig[badEdgeCount] ][2]
 
     def info(self):
         """
@@ -120,9 +121,18 @@ class RemoveBadEdgeData:
         details of the triangulation with the smallest complexity that has
         been discovered so far.
         """
-        return "Time: {:.6f}. Seen: {}. Visited: {}. Min: {}, {}.".format(
-                self.totalTime(), self._total, self._explored,
-                self._minComplexity(), self._minSig )
+        minFormat = " Min{}: {}, {}."
+        msg = ""
+        for badEdgeCount in self._minSig:
+            msg += minFormat.format(
+                    badEdgeCount,
+                    self._minComplexity(badEdgeCount),
+                    self._minSig[badEdgeCount] )
+        msg += " Current: {}, {}.".format(
+                self._details[ self._current ][2],
+                self._current )
+        return "Time: {:.6f}. Seen: {}. Visited: {}.{}".format(
+                self.totalTime(), self._total, self._explored, msg )
 
     def nRunning(self):
         """
@@ -144,8 +154,10 @@ class RemoveBadEdgeData:
         self._nRunning += 1
 
     def _updateMinSig( self, sig, priority ):
-        if priority < self._minComplexity():
-            self._minSig = sig
+        badEdgeCount = priority[0]
+        if ( ( badEdgeCount not in self._minSig ) or
+                ( priority < self._minComplexity(badEdgeCount) ) ):
+            self._minSig[badEdgeCount] = sig
 
     def target(self):
         """
@@ -235,6 +247,7 @@ class RemoveBadEdgeData:
         priority, _, sig = self._queue.get(False)
         self._explored += 1
         source = self._details[sig][1]
+        self._current = sig
         return ( sig, priority, source )
 
     def backtrack( self, sig ):
