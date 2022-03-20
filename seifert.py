@@ -17,7 +17,6 @@ class Fibre(Enum):
     REGULAR = auto()        # Curve that is a regular fibre.
 
 
-# TODO Include Mobius band base.
 class SFS(Enum):
     UNKNOWN = auto()    # Unknown whether SFS or not.
     NOTSFS = auto()     # Not an SFS.
@@ -28,7 +27,6 @@ class SFS(Enum):
     DISCTHREE = auto()  # SFS over disc, class bo1; 3 exceptional fibres.
 
 
-# TODO Include Mobius band base.
 def recogniseSFS(tri):
     """
     Uses combinatorial recognition to determine whether the given
@@ -177,7 +175,7 @@ def isFibre(edge):
             if ( compress.countBoundaryComponents() == 1 and
                     compress.boundaryComponent(0).eulerChar() == 2 ):
                 # TODO Test.
-                print( "        Compressing disc!" )
+#                print( "        Compressing disc!" )
                 return Fibre.NONFIBRE
         elif euler == 0:
             annuli.append(s)
@@ -185,7 +183,7 @@ def isFibre(edge):
         # The drilled triangulation has no essential annuli, so we cannot
         # have drilled out a Seifert fibre.
         # TODO Test.
-        print( "        No annuli!" )
+#        print( "        No annuli!" )
         return Fibre.NONFIBRE
     # We are looking for an annulus that either:
     #   --> cuts the drilled triangulation into two solid tori (in which case
@@ -317,7 +315,7 @@ def isFibre(edge):
 
     # Surviving to this point means that the annulus we were looking for
     # doesn't exist.
-    print( "        Survived cutting!" )
+#    print( "        Survived cutting!" )
     return Fibre.NONFIBRE
 
 
