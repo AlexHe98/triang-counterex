@@ -2,6 +2,7 @@
 Helper functions for searching the Pachner graph for counterexamples.
 """
 from regina import *
+from seifert import Fibre, isFibre
 
 
 def isCore( edge ):
@@ -42,6 +43,14 @@ def isTunnel( edge ):
     slow if the given edge belongs to a large triangulation.
     """
     return pinchGivesHandlebody( edge, 2 )
+
+
+def possibleFibre( edge ):
+    """
+    Returns True if we cannot rule out the possibility that the given edge is
+    isotopic to a fibre in a small Seifert fibre space.
+    """
+    return ( isFibre(edge) is not Fibre.NONFIBRE )
 
 
 def mulDefect(e):
