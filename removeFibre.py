@@ -21,9 +21,20 @@ if __name__ == "__main__":
     sig = argv[1]
     nProcesses = int( argv[2] )
     interval = int( argv[3] )
-    print( "Removing Seifert fibres. Sig: {}, #Processes: {}.".format(
-        sig, nProcesses ) )
+    try:
+        minArg = argv[4]
+    except IndexError:
+        useMin = False
+    else:
+        if minArg == "min":
+            useMin = True
+        else:
+            print( "    Unknown argument \"{}\".".format(minArg) )
+            useMin = False
+    print( "Removing {}. Sig: {}, #Processes: {}. UseMin?: {}".format(
+        "Seifert fibres", sig, nProcesses, useMin ) )
     stdout.flush()
     print( "Results: {}\n".format( removeBadEdge(
-        sig, nProcesses, interval, possibleFibre, "Seifert fibres", 1 ) ) )
+        sig, nProcesses, interval, possibleFibre,
+        "Seifert fibres", 1, useMin ) ) )
 
