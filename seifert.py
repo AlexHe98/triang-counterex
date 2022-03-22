@@ -319,6 +319,108 @@ def isFibre(edge):
     return Fibre.NONFIBRE
 
 
+def isExceptionalFibre(edge):
+    """
+    Assuming that the given edge belongs to a one-vertex triangulation of a
+    small Seifert fibre space, determines whether this edge is isotopic to an
+    exceptional fibre.
+    """
+    # Drill out the given edge.
+    drilled = Triangulation3( edge.triangulation() )
+    drilled.pinchEdge( drilled.edge( edge.index() ) )
+    drilled.idealToFinite()
+    drilled.intelligentSimplify()
+    drilled.intelligentSimplify()
+
+    # Retriangulate with height 0 (single-threaded), and see if we can ever
+    # recognise the drilled triangulation as a Seifert fibre space.
+    classifications = []
+    def recognise( sig, tri ):
+        c = recogniseSFS(tri)
+        if c is SFS.UNKNOWN:
+            # We don't know if we have a Seifert fibre space.
+        elif c is SFS.NOTSFS:
+            # Combinatorial recognition should never be able to prove that
+            # tri is not a Seifert fibre space.
+            raise ValueError( "Recognises {}".format(c) )
+        # We definitely have a Seifert fibre space.
+        classifications.append(c)
+        return True
+    if drilled.retriangulate( 0, 1, recognise ):
+        # The drilled triangulation is definitely a Seifert fibre space.
+        if len(classifications) != 1:
+            raise ValueError( "Wrong number of classifications: {}".format(
+                classifications ) )
+        c = classifications[0]
+        return ( ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ) )
+
+    # Look for essential annuli. By Corollary 6.8 of "Algorithms for the
+    # complete decomposition of a closed 3-manifold" (Jaco and Tollefson,
+    # 1995), such annuli are guaranteed to appear either as a two-sided
+    # vertex normal surface or as the double of a one-sided vertex normal
+    # surface (the latter case is necessary because Jaco and Tollefson do not
+    # consider one-sided surfaces to be vertex surfaces).
+    surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
+    annuli = []
+    for s in surfs:
+        if not s.hasRealBoundary():
+            continue
+        euler = s.eulerChar()
+        if not s.isOrientable():
+            # The surface is bounded and non-orientable. If it is a Mobius
+            # band, then we need to double it.
+            if euler != 0:
+                continue
+            doubleSurf = s.doubleSurface()
+            # We know for sure that doubleSurf has real boundary and has
+            # Euler characteristic 0. For peace of mind, we double check that
+            # it is connected and orientable.
+            if doubleSurf.isOrientable() and doubleSurf.isConnected():
+                annuli.append(doubleSurf)
+            else:
+                raise ValueError( "Unexpected double of Mobius band." )
+            continue
+        if euler == 1:
+            # The surface s is a disc. Determine whether it is a compressing
+            # disc by cutting along s and checking whether the torus boundary
+            # gets compressed down to a single sphere boundary.
+            compress = s.cutAlong()
+            compress.intelligentSimplify()
+            compress.intelligentSimplify()
+            if ( compress.countBoundaryComponents() == 1 and
+                    compress.boundaryComponent(0).eulerChar() == 2 ):
+                return False
+        elif euler == 0:
+            annuli.append(s)
+    if not annuli:
+        # The drilled triangulation has no essential annuli, so we cannot
+        # have drilled out an exceptional fibre.
+        return False
+    # We are looking for an annulus that cuts the drilled triangulation into
+    # two solid tori.
+    for a in annuli:
+        # Try cutting along the annulus a. If this causes the drilled
+        # triangulation to fall apart into two solid tori, then we know that
+        # we drilled out an exceptional fibre.
+        cut = a.cutAlong()
+        if cut.countComponents() != 2:
+            # Cutting along a only yields one piece, so it isn't the annulus
+            # we're looking for. Move along to the next annulus.
+            continue
+        onlySolidTori = True
+        for comp in cut.triangulateComponents():
+            comp.intelligentSimplify()
+            comp.intelligentSimplify()
+            if not comp.isSolidTorus():
+                onlySolidTori = False
+                break
+        if onlySolidTori:
+            return True
+    # Surviving to this point means that the annulus we were looking doesn't
+    # exist, which implies that we did not drill out an exceptional fibre.
+    return False
+
+
 # Test code.
 if __name__ == "__main__":
     # Generate test triangulations.
