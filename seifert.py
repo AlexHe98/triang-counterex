@@ -339,6 +339,7 @@ def isExceptionalFibre(edge):
         c = recogniseSFS(tri)
         if c is SFS.UNKNOWN:
             # We don't know if we have a Seifert fibre space.
+            return False
         elif c is SFS.NOTSFS:
             # Combinatorial recognition should never be able to prove that
             # tri is not a Seifert fibre space.
