@@ -102,8 +102,6 @@ def isFibre(edge):
     if drilled.hasStrictAngleStructure():
         return Fibre.NONFIBRE
 
-    # TODO Test.
-    isRegular = False
     # Now truncate, and see whether we can prove that the edge is isotopic to
     # a Seifert fibre using combinatorial recognition.
     drilled.idealToFinite()
@@ -133,10 +131,7 @@ def isFibre(edge):
         if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
             return Fibre.EXCEPTIONAL
         elif c is SFS.DISCTHREE:
-            # TODO Test.
-            print( "            Combinatorial recognition says REGULAR." )
-            isRegular = True
-            #return Fibre.REGULAR
+            return Fibre.REGULAR
         elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
             return Fibre.NONFIBRE
         else:
@@ -171,11 +166,7 @@ def isFibre(edge):
             # Euler characteristic 0. We just need to check that it is
             # connected and orientable.
             if doubleSurf.isOrientable() and doubleSurf.isConnected():
-                if doubleSurf.isThinEdgeLink()[0] is None:
-                    annuli.append(doubleSurf)
-                # TODO Test.
-#                else:
-#                    print( "                Edge linking Mobius band." )
+                annuli.append(doubleSurf)
             else:
                 raise ValueError( "Unexpected double of Mobius band." )
             continue
@@ -188,20 +179,13 @@ def isFibre(edge):
             compress.intelligentSimplify()
             if ( compress.countBoundaryComponents() == 1 and
                     compress.boundaryComponent(0).eulerChar() == 2 ):
-                # TODO Test.
-#                print( "        Compressing disc!" )
                 return Fibre.NONFIBRE
         elif euler == 0:
             if s.isThinEdgeLink()[0] is None:
                 annuli.append(s)
-            # TODO Test.
-#            else:
-#                print( "                Edge linking annulus." )
     if not annuli:
         # The drilled triangulation has no essential annuli, so we cannot
         # have drilled out a Seifert fibre.
-        # TODO Test.
-#        print( "        No annuli!" )
         return Fibre.NONFIBRE
     # We are looking for an annulus that either:
     #   --> cuts the drilled triangulation into two solid tori (in which case
@@ -260,7 +244,6 @@ def isFibre(edge):
             if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
                 # The current "other piece" is good.
                 goodOtherCount += 1
-                print ( "                Found {}!".format(goodOtherCount) )
                 continue
             elif c is SFS.DISCTHREE:
                 # We cannot conclude anything in this case.
@@ -292,11 +275,7 @@ def isFibre(edge):
                 # Euler characteristic 0. We just need to check that it is
                 # connected and orientable.
                 if doubleSurf.isOrientable() and doubleSurf.isConnected():
-                    if doubleSurf.isThinEdgeLink()[0] is None:
-                        cutAnnuli.append(doubleSurf)
-                    # TODO Test.
-                    else:
-                        print( "                Edge linking Mobius band." )
+                    cutAnnuli.append(doubleSurf)
                 else:
                     raise ValueError( "Unexpected double of Mobius band." )
                 continue
@@ -315,9 +294,6 @@ def isFibre(edge):
             elif euler == 0:
                 if s.isThinEdgeLink()[0] is None:
                     cutAnnuli.append(s)
-                # TODO Test.
-                else:
-                    print( "                Edge linking annulus." )
         if hasCompress or not cutAnnuli:
             # We have a compressing disc, or we don't have any annuli. In
             # either case, the annulus a isn't the one we're looking for.
@@ -342,18 +318,10 @@ def isFibre(edge):
             if onlySolidTori:
                 # The current "other piece" is good.
                 goodOtherCount += 1
-                print ( "                Found {}!".format(goodOtherCount) )
                 continue
 
-    # TODO Test.
-    if isRegular:
-        if goodOtherCount < 3:
-            raise ValueError( "REGULAR FAIL!" )
-        else:
-            return Fibre.REGULAR
     # Did we find enough "other pieces" that were good?
     if goodOtherCount < 3:
-        print( "            Not enough good annuli!" )
         return Fibre.NONFIBRE
     else:
         return Fibre.UNKNOWN
