@@ -543,3 +543,23 @@ if __name__ == "__main__":
             print( "Height {}: Found {} sigs with {} new {}.".format(
                 height, len(sigSet), newNonFibres, "non-exc-fibres" ) )
 
+    # Tests for SFS with no edges isotopic to exceptional fibres.
+    noExcFibres = [
+            "oLvPvLQLQQcccgkhjlkmknlmnnhrauchalaahjggf",
+            "oLvPvLMPQQcccgljlmknnjkkmnqjaqlaaiqaidkgb" ]
+    for sig in noExcFibres:
+        print()
+        print(sig)
+        tri = Triangulation3.fromIsoSig(sig)
+        for i in range( tri.countEdges() ):
+            msg = "    e{}".format(i) + ": {}"
+            try:
+                fibreType = isFibre( tri.edge(i) )
+            except ValueError as err:
+                print( msg.format(err) )
+            else:
+                if fibreType is Fibre.NONFIBRE:
+                    print( msg.format( fibreType.name + "   <--" ) )
+                else:
+                    print( msg.format( fibreType.name ) )
+
