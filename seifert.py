@@ -87,8 +87,12 @@ def recogniseSFS(tri):
 def isFibre(edge):
     """
     Assuming that the given edge belongs to a one-vertex triangulation of a
-    small Seifert fibre space that is not also fibred over the projective
-    plane, determines whether this edge is isotopic to a Seifert fibre.
+    small Seifert fibre space (i.e., a Seifert fibre space over the sphere
+    three exceptional fibres), determines whether this edge is isotopic to a
+    Seifert fibre in the fibring over the disc (note that the space could
+    hava a different Seifert fibring over the projective plane, but this
+    routine will *not* consider the regular fibres of such a fibring to be a
+    fibre).
     """
     # Pinch the given edge. If the resulting ideal triangulation admits a
     # strict angle structure, then the edge cannot be a Seifert fibre.
@@ -125,9 +129,9 @@ def isFibre(edge):
         c = classifications[0]
         if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
             return Fibre.EXCEPTIONAL
-        elif ( c is SFS.DISCTHREE ) or ( c is SFS.MOBIUSONE ):
+        elif c is SFS.DISCTHREE:
             return Fibre.REGULAR
-        elif c is SFS.OTHERSFS:
+        elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
             return Fibre.NONFIBRE
         else:
             raise ValueError(
@@ -239,12 +243,12 @@ def isFibre(edge):
             if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
                 # We cannot say anything definitive without doing more work.
                 return Fibre.UNKNOWN
-            elif ( c is SFS.DISCTHREE ) or ( c is SFS.MOBIUSONE ):
+            elif c is SFS.DISCTHREE:
                 # We must have drilled out a regular fibre and then cut along
                 # a boundary-parallel annulus.
                 # TODO Check this.
                 return Fibre.REGULAR
-            elif c is SFS.OTHERSFS:
+            elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
                 # We cannot get this if we drilled out a Seifert fibre.
                 # TODO Check this.
                 return Fibre.NONFIBRE
@@ -502,46 +506,47 @@ if __name__ == "__main__":
             return ( False, fibreSigs )
 
     # Perform tests.
-    for sig, name in tests:
-        print()
-        print( sig, name )
-        for tri, i, name in genEdges(sig):
-            msg = "    " + name + ": {}"
-            try:
-                fibreType = isFibre( tri.edge(i) )
-            except ValueError as err:
-                print( msg.format( err ) )
-            else:
-                if fibreType is Fibre.NONFIBRE:
-                    print( msg.format( fibreType.name + "   <--" ) )
-                else:
-                    print( msg.format( fibreType.name ) )
-        print()
-        height = 0
-        sigSet = {sig}
-        newNonFibres = 0
-        maxHeight = 4
-        maxSize = 15
-        while height < maxHeight and len(sigSet) < maxSize:
-            height += 1
-            foundNew, sigSet = findNonFibres(sigSet)
-            if foundNew:
-                newNonFibres += 1
-            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
-                height, len(sigSet), newNonFibres ) )
-        print()
-        height = 0
-        sigSet = {sig}
-        newNonFibres = 0
-        maxHeight = 4
-        maxSize = 15
-        while height < maxHeight and len(sigSet) < maxSize:
-            height += 1
-            foundNew, sigSet = findNonExcFibres(sigSet)
-            if foundNew:
-                newNonFibres += 1
-            print( "Height {}: Found {} sigs with {} new {}.".format(
-                height, len(sigSet), newNonFibres, "non-exc-fibres" ) )
+    # TODO Reinstate later.
+#    for sig, name in tests:
+#        print()
+#        print( sig, name )
+#        for tri, i, name in genEdges(sig):
+#            msg = "    " + name + ": {}"
+#            try:
+#                fibreType = isFibre( tri.edge(i) )
+#            except ValueError as err:
+#                print( msg.format( err ) )
+#            else:
+#                if fibreType is Fibre.NONFIBRE:
+#                    print( msg.format( fibreType.name + "   <--" ) )
+#                else:
+#                    print( msg.format( fibreType.name ) )
+#        print()
+#        height = 0
+#        sigSet = {sig}
+#        newNonFibres = 0
+#        maxHeight = 4
+#        maxSize = 15
+#        while height < maxHeight and len(sigSet) < maxSize:
+#            height += 1
+#            foundNew, sigSet = findNonFibres(sigSet)
+#            if foundNew:
+#                newNonFibres += 1
+#            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
+#                height, len(sigSet), newNonFibres ) )
+#        print()
+#        height = 0
+#        sigSet = {sig}
+#        newNonFibres = 0
+#        maxHeight = 4
+#        maxSize = 15
+#        while height < maxHeight and len(sigSet) < maxSize:
+#            height += 1
+#            foundNew, sigSet = findNonExcFibres(sigSet)
+#            if foundNew:
+#                newNonFibres += 1
+#            print( "Height {}: Found {} sigs with {} new {}.".format(
+#                height, len(sigSet), newNonFibres, "non-exc-fibres" ) )
 
     # Tests for SFS with no edges isotopic to exceptional fibres.
     noExcFibres = [
