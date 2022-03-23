@@ -481,6 +481,26 @@ if __name__ == "__main__":
         else:
             return ( False, fibreSigs )
 
+    # How common are edges that are *not* isotopic to exceptional fibres?
+    def findNonExcFibres(sigs):
+        nonFibreSigs = set()
+        fibreSigs = set()
+        for s in sigs:
+            t = Triangulation3.fromIsoSig(s)
+            for f in t.triangles():
+                result = twoThree(f)
+                if result is None:
+                    continue
+                newt = result[0]
+                if isExceptionalFibre( newt.edge( result[1][-1] ) ):
+                    fibreSigs.add( newt.isoSig() )
+                else:
+                    nonFibreSigs.add( newt.isoSig() )
+        if nonFibreSigs:
+            return ( True, nonFibreSigs )
+        else:
+            return ( False, fibreSigs )
+
     # Perform tests.
     for sig, name in tests:
         print()
@@ -509,4 +529,17 @@ if __name__ == "__main__":
                 newNonFibres += 1
             print( "Height {}: Found {} sigs with {} new non-fibres.".format(
                 height, len(sigSet), newNonFibres ) )
+        print()
+        height = 0
+        sigSet = {sig}
+        newNonFibres = 0
+        maxHeight = 4
+        maxSize = 15
+        while height < maxHeight and len(sigSet) < maxSize:
+            height += 1
+            foundNew, sigSet = findNonExcFibres(sigSet)
+            if foundNew:
+                newNonFibres += 1
+            print( "Height {}: Found {} sigs with {} new {}.".format(
+                height, len(sigSet), newNonFibres, "non-exc-fibres" ) )
 
