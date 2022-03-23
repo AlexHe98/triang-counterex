@@ -228,7 +228,10 @@ def isFibre(edge):
         otherPieces.append( notSolidTorus[0] )
 
     # We definitely didn't drill out an exceptional fibre. Did we perhaps
-    # drill out a regular fibre instead?
+    # drill out a regular fibre instead? If so, then we must have at least
+    # three "other pieces" that form Seifert fibre spaces over the disc with
+    # two exceptional fibres.
+    goodOtherCount = 0
     for other in otherPieces:
         # Retriangulate with height 0 (single-threaded), and see if we can
         # recognise this other piece as a Seifert fibre space.
@@ -241,8 +244,9 @@ def isFibre(edge):
                             classifications ) )
             c = classifications[0]
             if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
-                # We cannot say anything definitive without doing more work.
-                return Fibre.UNKNOWN
+                # The current "other piece" is good.
+                goodOtherCount += 1
+                continue
             elif c is SFS.DISCTHREE:
                 # We must have drilled out a regular fibre and then cut along
                 # a boundary-parallel annulus.
@@ -314,13 +318,15 @@ def isFibre(edge):
                     onlySolidTori = False
                     break
             if onlySolidTori:
-                # We cannot say anything definitive without doing more work.
-                return Fibre.UNKNOWN
+                # The current "other piece" is good.
+                goodOtherCount += 1
+                continue
 
-    # Surviving to this point means that the annulus we were looking for
-    # doesn't exist.
-#    print( "        Survived cutting!" )
-    return Fibre.NONFIBRE
+    # Did we find enough "other pieces" that were good?
+    if goodOtherCount < 3:
+        return Fibre.NONFIBRE
+    else:
+        return Fibre.UNKNOWN
 
 
 def isExceptionalFibre(edge):
@@ -506,47 +512,46 @@ if __name__ == "__main__":
             return ( False, fibreSigs )
 
     # Perform tests.
-    # TODO Reinstate later.
-#    for sig, name in tests:
-#        print()
-#        print( sig, name )
-#        for tri, i, name in genEdges(sig):
-#            msg = "    " + name + ": {}"
-#            try:
-#                fibreType = isFibre( tri.edge(i) )
-#            except ValueError as err:
-#                print( msg.format( err ) )
-#            else:
-#                if fibreType is Fibre.NONFIBRE:
-#                    print( msg.format( fibreType.name + "   <--" ) )
-#                else:
-#                    print( msg.format( fibreType.name ) )
-#        print()
-#        height = 0
-#        sigSet = {sig}
-#        newNonFibres = 0
-#        maxHeight = 4
-#        maxSize = 15
-#        while height < maxHeight and len(sigSet) < maxSize:
-#            height += 1
-#            foundNew, sigSet = findNonFibres(sigSet)
-#            if foundNew:
-#                newNonFibres += 1
-#            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
-#                height, len(sigSet), newNonFibres ) )
-#        print()
-#        height = 0
-#        sigSet = {sig}
-#        newNonFibres = 0
-#        maxHeight = 4
-#        maxSize = 15
-#        while height < maxHeight and len(sigSet) < maxSize:
-#            height += 1
-#            foundNew, sigSet = findNonExcFibres(sigSet)
-#            if foundNew:
-#                newNonFibres += 1
-#            print( "Height {}: Found {} sigs with {} new {}.".format(
-#                height, len(sigSet), newNonFibres, "non-exc-fibres" ) )
+    for sig, name in tests:
+        print()
+        print( sig, name )
+        for tri, i, name in genEdges(sig):
+            msg = "    " + name + ": {}"
+            try:
+                fibreType = isFibre( tri.edge(i) )
+            except ValueError as err:
+                print( msg.format( err ) )
+            else:
+                if fibreType is Fibre.NONFIBRE:
+                    print( msg.format( fibreType.name + "   <--" ) )
+                else:
+                    print( msg.format( fibreType.name ) )
+        print()
+        height = 0
+        sigSet = {sig}
+        newNonFibres = 0
+        maxHeight = 4
+        maxSize = 15
+        while height < maxHeight and len(sigSet) < maxSize:
+            height += 1
+            foundNew, sigSet = findNonFibres(sigSet)
+            if foundNew:
+                newNonFibres += 1
+            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
+                height, len(sigSet), newNonFibres ) )
+        print()
+        height = 0
+        sigSet = {sig}
+        newNonFibres = 0
+        maxHeight = 4
+        maxSize = 15
+        while height < maxHeight and len(sigSet) < maxSize:
+            height += 1
+            foundNew, sigSet = findNonExcFibres(sigSet)
+            if foundNew:
+                newNonFibres += 1
+            print( "Height {}: Found {} sigs with {} new {}.".format(
+                height, len(sigSet), newNonFibres, "non-exc-fibres" ) )
 
     # Tests for SFS with no edges isotopic to exceptional fibres.
     noExcFibres = [
