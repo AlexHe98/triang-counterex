@@ -4,6 +4,7 @@ Seifert fibre, where we know in advance that e belongs to a one-vertex
 triangulation of a small Seifert fibre space (i.e., a Seifert fibre space
 over S^2 with three exceptional fibres).
 """
+from sys import stdout
 from enum import Enum, auto
 from regina import *
 from pachner import twoThree
@@ -101,6 +102,8 @@ def isFibre(edge):
     if drilled.hasStrictAngleStructure():
         return Fibre.NONFIBRE
 
+    # TODO Test.
+    isRegular = False
     # Now truncate, and see whether we can prove that the edge is isotopic to
     # a Seifert fibre using combinatorial recognition.
     drilled.idealToFinite()
@@ -130,7 +133,10 @@ def isFibre(edge):
         if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
             return Fibre.EXCEPTIONAL
         elif c is SFS.DISCTHREE:
-            return Fibre.REGULAR
+            # TODO Test.
+            print( "            Combinatorial recognition says REGULAR." )
+            isRegular = True
+            #return Fibre.REGULAR
         elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
             return Fibre.NONFIBRE
         else:
@@ -165,7 +171,11 @@ def isFibre(edge):
             # Euler characteristic 0. We just need to check that it is
             # connected and orientable.
             if doubleSurf.isOrientable() and doubleSurf.isConnected():
-                annuli.append(doubleSurf)
+                if doubleSurf.isThinEdgeLink()[0] is None:
+                    annuli.append(doubleSurf)
+                # TODO Test.
+#                else:
+#                    print( "                Edge linking Mobius band." )
             else:
                 raise ValueError( "Unexpected double of Mobius band." )
             continue
@@ -182,7 +192,11 @@ def isFibre(edge):
 #                print( "        Compressing disc!" )
                 return Fibre.NONFIBRE
         elif euler == 0:
-            annuli.append(s)
+            if s.isThinEdgeLink()[0] is None:
+                annuli.append(s)
+            # TODO Test.
+#            else:
+#                print( "                Edge linking annulus." )
     if not annuli:
         # The drilled triangulation has no essential annuli, so we cannot
         # have drilled out a Seifert fibre.
@@ -246,12 +260,11 @@ def isFibre(edge):
             if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
                 # The current "other piece" is good.
                 goodOtherCount += 1
+                print ( "                Found {}!".format(goodOtherCount) )
                 continue
             elif c is SFS.DISCTHREE:
-                # We must have drilled out a regular fibre and then cut along
-                # a boundary-parallel annulus.
-                # TODO Check this.
-                return Fibre.REGULAR
+                # We cannot conclude anything in this case.
+                continue
             elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
                 # We cannot get this if we drilled out a Seifert fibre.
                 # TODO Check this.
@@ -279,9 +292,14 @@ def isFibre(edge):
                 # Euler characteristic 0. We just need to check that it is
                 # connected and orientable.
                 if doubleSurf.isOrientable() and doubleSurf.isConnected():
-                    cutAnnuli.append(doubleSurf)
+                    if doubleSurf.isThinEdgeLink()[0] is None:
+                        cutAnnuli.append(doubleSurf)
+                    # TODO Test.
+                    else:
+                        print( "                Edge linking Mobius band." )
                 else:
                     raise ValueError( "Unexpected double of Mobius band." )
+                continue
             if euler == 1:
                 # The surface s is a disc. Determine whether it is a
                 # compressing disc by cutting along s and checking whether
@@ -295,7 +313,11 @@ def isFibre(edge):
                     hasCompress = True
                     break
             elif euler == 0:
-                cutAnnuli.append(s)
+                if s.isThinEdgeLink()[0] is None:
+                    cutAnnuli.append(s)
+                # TODO Test.
+                else:
+                    print( "                Edge linking annulus." )
         if hasCompress or not cutAnnuli:
             # We have a compressing disc, or we don't have any annuli. In
             # either case, the annulus a isn't the one we're looking for.
@@ -320,10 +342,18 @@ def isFibre(edge):
             if onlySolidTori:
                 # The current "other piece" is good.
                 goodOtherCount += 1
+                print ( "                Found {}!".format(goodOtherCount) )
                 continue
 
+    # TODO Test.
+    if isRegular:
+        if goodOtherCount < 3:
+            raise ValueError( "REGULAR FAIL!" )
+        else:
+            return Fibre.REGULAR
     # Did we find enough "other pieces" that were good?
     if goodOtherCount < 3:
+        print( "            Not enough good annuli!" )
         return Fibre.NONFIBRE
     else:
         return Fibre.UNKNOWN
@@ -512,51 +542,57 @@ if __name__ == "__main__":
             return ( False, fibreSigs )
 
     # Perform tests.
-    for sig, name in tests:
-        print()
-        print( sig, name )
-        for tri, i, name in genEdges(sig):
-            msg = "    " + name + ": {}"
-            try:
-                fibreType = isFibre( tri.edge(i) )
-            except ValueError as err:
-                print( msg.format( err ) )
-            else:
-                if fibreType is Fibre.NONFIBRE:
-                    print( msg.format( fibreType.name + "   <--" ) )
-                else:
-                    print( msg.format( fibreType.name ) )
-        print()
-        height = 0
-        sigSet = {sig}
-        newNonFibres = 0
-        maxHeight = 4
-        maxSize = 15
-        while height < maxHeight and len(sigSet) < maxSize:
-            height += 1
-            foundNew, sigSet = findNonFibres(sigSet)
-            if foundNew:
-                newNonFibres += 1
-            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
-                height, len(sigSet), newNonFibres ) )
-        print()
-        height = 0
-        sigSet = {sig}
-        newNonFibres = 0
-        maxHeight = 4
-        maxSize = 15
-        while height < maxHeight and len(sigSet) < maxSize:
-            height += 1
-            foundNew, sigSet = findNonExcFibres(sigSet)
-            if foundNew:
-                newNonFibres += 1
-            print( "Height {}: Found {} sigs with {} new {}.".format(
-                height, len(sigSet), newNonFibres, "non-exc-fibres" ) )
+#    for sig, name in tests:
+#        print()
+#        print( sig, name )
+#        for tri, i, name in genEdges(sig):
+#            msg = "    " + name + ": {}"
+#            try:
+#                fibreType = isFibre( tri.edge(i) )
+#            except ValueError as err:
+#                print( msg.format( err ) )
+#            else:
+#                if fibreType is Fibre.NONFIBRE:
+#                    print( msg.format( fibreType.name + "   <--" ) )
+#                else:
+#                    print( msg.format( fibreType.name ) )
+#            stdout.flush()
+#        print()
+#        height = 0
+#        sigSet = {sig}
+#        newNonFibres = 0
+#        maxHeight = 3
+#        maxSize = 10
+#        while height < maxHeight and len(sigSet) < maxSize:
+#            height += 1
+#            foundNew, sigSet = findNonFibres(sigSet)
+#            if foundNew:
+#                newNonFibres += 1
+#            print( "Height {}: Found {} sigs with {} new non-fibres.".format(
+#                height, len(sigSet), newNonFibres ) )
+#            stdout.flush()
+#        print()
+#        height = 0
+#        sigSet = {sig}
+#        newNonFibres = 0
+#        maxHeight = 3
+#        maxSize = 10
+#        while height < maxHeight and len(sigSet) < maxSize:
+#            height += 1
+#            foundNew, sigSet = findNonExcFibres(sigSet)
+#            if foundNew:
+#                newNonFibres += 1
+#            print( "Height {}: Found {} sigs with {} new {}.".format(
+#                height, len(sigSet), newNonFibres, "non-exc-fibres" ) )
+#            stdout.flush()
 
     # Tests for SFS with no edges isotopic to exceptional fibres.
     noExcFibres = [
-            "oLvPvLQLQQcccgkhjlkmknlmnnhrauchalaahjggf",
-            "oLvPvLMPQQcccgljlmknnjkkmnqjaqlaaiqaidkgb" ]
+#            "oLvPvLQLQQcccgkhjlkmknlmnnhrauchalaahjggf",
+#            "oLvPvLMPQQcccgljlmknnjkkmnqjaqlaaiqaidkgb",
+            "mLLvAwAQQcdfehijjlklklhsaagatthofwj",
+#            "nLLvPPvQQkcdegijlmjlkmmlhsagvaahhluovn",
+            "oLLLvMMLQQcbcgijkilmlnlmnnlsmjaxftatvfrcv" ]
     for sig in noExcFibres:
         print()
         print(sig)
@@ -569,7 +605,8 @@ if __name__ == "__main__":
                 print( msg.format(err) )
             else:
                 if fibreType is Fibre.NONFIBRE:
-                    print( msg.format( fibreType.name + "   <--" ) )
+                    print( msg.format( "--> " + fibreType.name + " <--" ) )
                 else:
                     print( msg.format( fibreType.name ) )
+            stdout.flush()
 
