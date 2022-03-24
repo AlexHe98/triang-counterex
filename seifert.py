@@ -558,15 +558,25 @@ if __name__ == "__main__":
 
     # Tests for SFS with no edges isotopic to exceptional fibres.
     noExcFibres = [
+            # No exceptional fibres.
 #            "oLvPvLQLQQcccgkhjlkmknlmnnhrauchalaahjggf",
 #            "oLvPvLMPQQcccgljlmknnjkkmnqjaqlaaiqaidkgb",
+            # No fibres at all.
             "mLLvAwAQQcdfehijjlklklhsaagatthofwj",
-#            "nLLvPPvQQkcdegijlmjlkmmlhsagvaahhluovn",
+            "nLLvPPvQQkcdegijlmjlkmmlhsagvaahhluovn",
             "oLLLvMMLQQcbcgijkilmlnlmnnlsmjaxftatvfrcv",
             "nLvPwLzQQkccgfiikjmklmlmhnahlupmtrsvgb",
             "nLLLvLQQPkccfghililkmklmlnacnbdwathjsn",
             "nLLLvLQQAkccfghliiljlkmmlnawnpjsqqjjxr",
-            "oLALLvALQQccbcegjkjlnnmnmmudbsaausjjckrkw" ]
+            "oLALLvALQQccbcegjkjlnnmnmmudbsaausjjckrkw",
+            "lLLvPAPQccdeghiihkkkjhsaggvgndqkj",
+            "mLLvPzPQQcdegiililjlkkhsagvgxgqhjsj",
+            "oLLLMwMMLQccdgfghjikknmnmnhshagcqiacinggn",
+            "oLLLMwMMwQccdgfghjikklnmnnhshagcqiacecrrf",
+            "oLLLMwwLQQccdgfghjlmnmnlmnhshagcqrclruobm",
+            "oLLLwwAPPQccdgfhkilmkmlnnnhshacqaacnccxhu",
+            "oLLLMwLPAQccdgfghkjkmllmnnhshagcabrcoobej",
+            "oLLLMwLQwQccdgfghilklkmmnnhshagciaccwaarj" ]
     for sig in noExcFibres:
         print()
         tri = Triangulation3.fromIsoSig(sig)
