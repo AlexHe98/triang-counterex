@@ -560,11 +560,23 @@ if __name__ == "__main__":
 #            "oLvPvLMPQQcccgljlmknnjkkmnqjaqlaaiqaidkgb",
             "mLLvAwAQQcdfehijjlklklhsaagatthofwj",
 #            "nLLvPPvQQkcdegijlmjlkmmlhsagvaahhluovn",
-            "oLLLvMMLQQcbcgijkilmlnlmnnlsmjaxftatvfrcv" ]
+            "oLLLvMMLQQcbcgijkilmlnlmnnlsmjaxftatvfrcv",
+            "nLvPwLzQQkccgfiikjmklmlmhnahlupmtrsvgb",
+            "nLLLvLQQPkccfghililkmklmlnacnbdwathjsn",
+            "nLLLvLQQAkccfghliiljlkmmlnawnpjsqqjjxr",
+            "oLALLvALQQccbcegjkjlnnmnmmudbsaausjjckrkw" ]
     for sig in noExcFibres:
         print()
-        print(sig)
         tri = Triangulation3.fromIsoSig(sig)
+        simplified = Triangulation3(tri)
+        simplified.intelligentSimplify()
+        simplified.intelligentSimplify()
+        blocked = BlockedSFS.recognise(simplified)
+        print(sig)
+        if blocked is not None:
+            print( blocked.manifold().detail().rstrip() )
+#        census = Census.lookup(simplified)
+#        print(census)
         for i in range( tri.countEdges() ):
             msg = "    e{}".format(i) + ": {}"
             try:
