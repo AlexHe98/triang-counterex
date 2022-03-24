@@ -99,6 +99,8 @@ def isFibre(edge):
     # strict angle structure, then the edge cannot be a Seifert fibre.
     drilled = Triangulation3( edge.triangulation() )
     drilled.pinchEdge( drilled.edge( edge.index() ) )
+    drilled.intelligentSimplify()
+    drilled.intelligentSimplify()
     if drilled.hasStrictAngleStructure():
         return Fibre.NONFIBRE
 
