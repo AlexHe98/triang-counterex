@@ -99,6 +99,8 @@ def isFibre(edge):
     # strict angle structure, then the edge cannot be a Seifert fibre.
     drilled = Triangulation3( edge.triangulation() )
     drilled.pinchEdge( drilled.edge( edge.index() ) )
+#    if drilled.hasStrictAngleStructure():
+#        return Fibre.NONFIBRE
     drilled.intelligentSimplify()
     drilled.intelligentSimplify()
     if drilled.hasStrictAngleStructure():
@@ -106,6 +108,8 @@ def isFibre(edge):
 
     # Now truncate, and see whether we can prove that the edge is isotopic to
     # a Seifert fibre using combinatorial recognition.
+    drilled = Triangulation3( edge.triangulation() )
+    drilled.pinchEdge( drilled.edge( edge.index() ) )
     drilled.idealToFinite()
     drilled.intelligentSimplify()
     drilled.intelligentSimplify()
@@ -564,19 +568,22 @@ if __name__ == "__main__":
             # No fibres at all.
             "mLLvAwAQQcdfehijjlklklhsaagatthofwj",
             "nLLvPPvQQkcdegijlmjlkmmlhsagvaahhluovn",
-            "oLLLvMMLQQcbcgijkilmlnlmnnlsmjaxftatvfrcv",
+#            "oLLLvMMLQQcbcgijkilmlnlmnnlsmjaxftatvfrcv",
             "nLvPwLzQQkccgfiikjmklmlmhnahlupmtrsvgb",
             "nLLLvLQQPkccfghililkmklmlnacnbdwathjsn",
             "nLLLvLQQAkccfghliiljlkmmlnawnpjsqqjjxr",
-            "oLALLvALQQccbcegjkjlnnmnmmudbsaausjjckrkw",
+#            "oLALLvALQQccbcegjkjlnnmnmmudbsaausjjckrkw",
             "lLLvPAPQccdeghiihkkkjhsaggvgndqkj",
-            "mLLvPzPQQcdegiililjlkkhsagvgxgqhjsj",
-            "oLLLMwMMLQccdgfghjikknmnmnhshagcqiacinggn",
-            "oLLLMwMMwQccdgfghjikklnmnnhshagcqiacecrrf",
-            "oLLLMwwLQQccdgfghjlmnmnlmnhshagcqrclruobm",
-            "oLLLwwAPPQccdgfhkilmkmlnnnhshacqaacnccxhu",
-            "oLLLMwLPAQccdgfghkjkmllmnnhshagcabrcoobej",
-            "oLLLMwLQwQccdgfghilklkmmnnhshagciaccwaarj" ]
+            "mLLvPzPQQcdegiililjlkkhsagvgxgqhjsj" ]
+#            "mLLvPzPQQcdegiililjlkkhsagvgxgqhjsj",
+#            "oLLLMwMMLQccdgfghjikknmnmnhshagcqiacinggn",
+#            "oLLLMwMMwQccdgfghjikklnmnnhshagcqiacecrrf",
+#            "oLLLMwwLQQccdgfghjlmnmnlmnhshagcqrclruobm" ]
+#            "oLLLMwwLQQccdgfghjlmnmnlmnhshagcqrclruobm",
+#            "oLLLwwAPPQccdgfhkilmkmlnnnhshacqaacnccxhu" ]
+#            "oLLLwwAPPQccdgfhkilmkmlnnnhshacqaacnccxhu",
+#            "oLLLMwLPAQccdgfghkjkmllmnnhshagcabrcoobej",
+#            "oLLLMwLQwQccdgfghilklkmmnnhshagciaccwaarj" ]
     for sig in noExcFibres:
         print()
         tri = Triangulation3.fromIsoSig(sig)
@@ -591,14 +598,26 @@ if __name__ == "__main__":
 #        print(census)
         for i in range( tri.countEdges() ):
             msg = "    e{}".format(i) + ": {}"
+            RandomEngine.reseedWithHardware()
             try:
                 fibreType = isFibre( tri.edge(i) )
             except ValueError as err:
                 print( msg.format(err) )
             else:
-                if fibreType is Fibre.NONFIBRE:
-                    print( msg.format( "--> " + fibreType.name + " <--" ) )
-                else:
-                    print( msg.format( fibreType.name ) )
+                output = True
+                if fibreType is Fibre.UNKNOWN:
+#                    print( "            Try again!" )
+                    RandomEngine.reseedWithHardware()
+                    try:
+                        fibreType = isFibre( tri.edge(i) )
+                    except ValueError as err:
+                        print( msg.format(err) )
+                        output = False
+                if output:
+                    if fibreType is Fibre.NONFIBRE:
+                        print( msg.format(
+                            "--> " + fibreType.name + " <--" ) )
+                    else:
+                        print( msg.format( fibreType.name ) )
             stdout.flush()
 
