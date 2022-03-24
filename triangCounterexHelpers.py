@@ -50,7 +50,12 @@ def possibleFibre( edge ):
     Returns True if we cannot rule out the possibility that the given edge is
     isotopic to a fibre in a small Seifert fibre space.
     """
-    return ( isFibre(edge) is not Fibre.NONFIBRE )
+    RandomEngine.reseedWithHardware()
+    fibreType = isFibre(edge)
+    if fibreType is Fibre.UNKNOWN:
+        RandomEngine.reseedWithHardware()
+        fibreType = isFibre(edge)
+    return ( fibreType is not Fibre.NONFIBRE )
 
 
 def mulDefect(e):
