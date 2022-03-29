@@ -104,61 +104,24 @@ def isFibre(edge):
     if drilled.hasStrictAngleStructure():
         return Fibre.NONFIBRE
 
-    # Now truncate, and see whether we can prove that the edge is isotopic to
-    # a Seifert fibre using combinatorial recognition.
+    # Now truncate and try looking at normal surfaces.
+    # Look for compressing discs, essential annuli and essential tori.
+    # By Corollary 6.8 of "Algorithms for the complete decomposition of a
+    # closed 3-manifold" (Jaco and Tollefson, 1995), the annuli and tori that
+    # we are looking for are (assuming they exist) guaranteed to appear
+    # either as a two-sided vertex normal surface or as the double of a
+    # one-sided vertex normal surface (the latter case is necessary because
+    # Jaco and Tollefson do not consider one-sided surfaces to be vertex
+    # surfaces).
     drilled.idealToFinite()
     drilled.intelligentSimplify()
     drilled.intelligentSimplify()
-    # Retriangulate with height 0 (single-threaded), and see if we can ever
-    # recognise the drilled triangulation as a Seifert fibre space.
-#    classifications = []
-#    def recognise( sig, tri ):
-#        c = recogniseSFS(tri)
-#        if c is SFS.UNKNOWN:
-#            # We don't know if we have a Seifert fibre space.
-#            return False
-#        elif c is SFS.NOTSFS:
-#            # Combinatorial recognition should never be able to prove that
-#            # tri is not a Seifert fibre space.
-#            raise ValueError( "Recognised {}".format(c) )
-#        # We definitely have a Seifert fibre space.
-#        classifications.append(c)
-#        return True
-#    if drilled.retriangulate( 0, 1, recognise ):
-#        # The drilled triangulation is definitely a Seifert fibre space.
-#        if len(classifications) != 1:
-#            raise ValueError( "Wrong number of classifications: {}".format(
-#                classifications ) )
-#        c = classifications[0]
-#        if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
-#            # TODO Test.
-#            #return Fibre.EXCEPTIONAL
-#            pass
-#        elif c is SFS.DISCTHREE:
-#            # TODO Test.
-#            #return Fibre.REGULAR
-#            print( "        Combinatorial recognition says REGULAR." )
-#            pass
-#        elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
-#            return Fibre.NONFIBRE
-#        else:
-#            raise ValueError(
-#                    "Should never recognise something as {}".format(c) )
-
-    # Fast tests have failed us. Try looking at normal surfaces.
-    # Look for essential annuli. By Corollary 6.8 of "Algorithms for the
-    # complete decomposition of a closed 3-manifold" (Jaco and Tollefson,
-    # 1995), such annuli are guaranteed to appear either as a two-sided
-    # vertex normal surface or as the double of a one-sided vertex normal
-    # surface (the latter case is necessary because Jaco and Tollefson do not
-    # consider one-sided surfaces to be vertex surfaces).
     surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
     annuli = []
     tori = []
     for s in surfs:
         euler = s.eulerChar()
         if not s.hasRealBoundary():
-            # TODO Experiment with tori.
             if euler != 0:
                 continue
             if s.isOrientable():
@@ -247,44 +210,13 @@ def isFibre(edge):
 
     # We definitely didn't drill out an exceptional fibre. Did we perhaps
     # drill out a regular fibre instead? If so, then we must have at least
-    # three "other pieces" that form Seifert fibre spaces over the disc with
-    # two exceptional fibres.
+    # three essential tori, and at least three "other pieces" that form
+    # Seifert fibre spaces over the disc with two exceptional fibres.
     if len(tori) < 3:
-        # If we drilled out a regular fibre, then we should have three
-        # essential tori.
-        # TODO Check this.
         return Fibre.NONFIBRE
     goodOtherCount = 0
     for other in otherPieces:
-        # Retriangulate with height 0 (single-threaded), and see if we can
-        # recognise this other piece as a Seifert fibre space.
-#        classifications = []
-#        if other.retriangulate( 0, 1, recognise ):
-#            # This other piece is definitely a Seifert fibre space.
-#            if len(classifications) != 1:
-#                raise ValueError(
-#                        "Wrong number of classifications: {}".format(
-#                            classifications ) )
-#            c = classifications[0]
-#            if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
-#                # The current "other piece" is good.
-#                # TODO Test.
-#                #goodOtherCount += 1
-#                #continue
-#                pass
-#            elif c is SFS.DISCTHREE:
-#                # We cannot conclude anything in this case.
-#                continue
-#            elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
-#                # We cannot get this if we drilled out a Seifert fibre.
-#                # TODO Check this.
-#                return Fibre.NONFIBRE
-#            else:
-#                raise ValueError(
-#                        "Should never recognise something as {} {}".format(
-#                            c, "after cutting" ) )
-
-        # Now try looking at normal surfaces in this other piece.
+        # Look at normal surfaces in this other piece.
         cutSurfs = NormalSurfaces.enumerate( other, NS_STANDARD )
         cutAnnuli = []
         hasCompress = False
