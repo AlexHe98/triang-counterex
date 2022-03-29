@@ -106,8 +106,6 @@ def isFibre(edge):
 
     # Now truncate, and see whether we can prove that the edge is isotopic to
     # a Seifert fibre using combinatorial recognition.
-    drilled = Triangulation3( edge.triangulation() )
-    drilled.pinchEdge( drilled.edge( edge.index() ) )
     drilled.idealToFinite()
     drilled.intelligentSimplify()
     drilled.intelligentSimplify()
@@ -606,8 +604,8 @@ if __name__ == "__main__":
             "nLLLvLQQAkccfghliiljlkmmlnawnpjsqqjjxr",
 #            "oLALLvALQQccbcegjkjlnnmnmmudbsaausjjckrkw",
             "lLLvPAPQccdeghiihkkkjhsaggvgndqkj",
-            "mLLvPzPQQcdegiililjlkkhsagvgxgqhjsj" ]
-#            "mLLvPzPQQcdegiililjlkkhsagvgxgqhjsj",
+#            "mLLvPzPQQcdegiililjlkkhsagvgxgqhjsj" ]
+            "mLLvPzPQQcdegiililjlkkhsagvgxgqhjsj",
 #            "oLLLMwMMLQccdgfghjikknmnmnhshagcqiacinggn",
 #            "oLLLMwMMwQccdgfghjikklnmnnhshagcqiacecrrf",
 #            "oLLLMwwLQQccdgfghjlmnmnlmnhshagcqrclruobm" ]
@@ -621,6 +619,10 @@ if __name__ == "__main__":
 #            "oLLvvLQPQQccdimkkhnmlllnmnhsvaaantlpuuuur",
 #            "oLLLwvAPQQccdgfhijklnmnmnmhshesadccjcvcnk",
 #            "oLLvLLAAQQccdgiljhmnkklmnnhsgvasndhuuubnn" ]
+            "nLLvMwzQQkcdfgikkmjljmlmhsagctthtaegwj",
+            "nLvvAAwQQkcgfhjjlmkmkjlmhahgooatptigof" ]
+#            "oLLvLLLQQQccdgimlmlkkjnknnhsgvtptiipolpof",
+#            "oLLvLMLPQQccdgjimmnkljknnmhsgcviihttoeggo" ]
 
     for sig in noExcFibres:
         print()
