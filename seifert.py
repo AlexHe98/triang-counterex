@@ -99,8 +99,6 @@ def isFibre(edge):
     # strict angle structure, then the edge cannot be a Seifert fibre.
     drilled = Triangulation3( edge.triangulation() )
     drilled.pinchEdge( drilled.edge( edge.index() ) )
-#    if drilled.hasStrictAngleStructure():
-#        return Fibre.NONFIBRE
     drilled.intelligentSimplify()
     drilled.intelligentSimplify()
     if drilled.hasStrictAngleStructure():
@@ -115,34 +113,39 @@ def isFibre(edge):
     drilled.intelligentSimplify()
     # Retriangulate with height 0 (single-threaded), and see if we can ever
     # recognise the drilled triangulation as a Seifert fibre space.
-    classifications = []
-    def recognise( sig, tri ):
-        c = recogniseSFS(tri)
-        if c is SFS.UNKNOWN:
-            # We don't know if we have a Seifert fibre space.
-            return False
-        elif c is SFS.NOTSFS:
-            # Combinatorial recognition should never be able to prove that
-            # tri is not a Seifert fibre space.
-            raise ValueError( "Recognised {}".format(c) )
-        # We definitely have a Seifert fibre space.
-        classifications.append(c)
-        return True
-    if drilled.retriangulate( 0, 1, recognise ):
-        # The drilled triangulation is definitely a Seifert fibre space.
-        if len(classifications) != 1:
-            raise ValueError( "Wrong number of classifications: {}".format(
-                classifications ) )
-        c = classifications[0]
-        if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
-            return Fibre.EXCEPTIONAL
-        elif c is SFS.DISCTHREE:
-            return Fibre.REGULAR
-        elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
-            return Fibre.NONFIBRE
-        else:
-            raise ValueError(
-                    "Should never recognise something as {}".format(c) )
+#    classifications = []
+#    def recognise( sig, tri ):
+#        c = recogniseSFS(tri)
+#        if c is SFS.UNKNOWN:
+#            # We don't know if we have a Seifert fibre space.
+#            return False
+#        elif c is SFS.NOTSFS:
+#            # Combinatorial recognition should never be able to prove that
+#            # tri is not a Seifert fibre space.
+#            raise ValueError( "Recognised {}".format(c) )
+#        # We definitely have a Seifert fibre space.
+#        classifications.append(c)
+#        return True
+#    if drilled.retriangulate( 0, 1, recognise ):
+#        # The drilled triangulation is definitely a Seifert fibre space.
+#        if len(classifications) != 1:
+#            raise ValueError( "Wrong number of classifications: {}".format(
+#                classifications ) )
+#        c = classifications[0]
+#        if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
+#            # TODO Test.
+#            #return Fibre.EXCEPTIONAL
+#            pass
+#        elif c is SFS.DISCTHREE:
+#            # TODO Test.
+#            #return Fibre.REGULAR
+#            print( "        Combinatorial recognition says REGULAR." )
+#            pass
+#        elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
+#            return Fibre.NONFIBRE
+#        else:
+#            raise ValueError(
+#                    "Should never recognise something as {}".format(c) )
 
     # Fast tests have failed us. Try looking at normal surfaces.
     # Look for essential annuli. By Corollary 6.8 of "Algorithms for the
@@ -153,15 +156,28 @@ def isFibre(edge):
     # consider one-sided surfaces to be vertex surfaces).
     surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
     annuli = []
+    tori = []
     for s in surfs:
-        if not s.hasRealBoundary():
-            if not s.isOrientable() or s.eulerChar() != 0:
-                continue
-            # TODO Experiment with vertex normal tori.
-            # We have a torus.
-#            print( "            Torus: {}".format( s.detail()[:60] ) )
-            continue
         euler = s.eulerChar()
+        if not s.hasRealBoundary():
+            # TODO Experiment with tori.
+            if euler != 0:
+                continue
+            if s.isOrientable():
+                # We have a torus.
+                if s.isThinEdgeLink()[0] is None:
+                    tori.append(s)
+            else:
+                # We have a Klein bottle. We need to double it.
+                doubleSurf = s.doubleSurface()
+                # We know for sure that doubleSurf is closed and has Euler
+                # characteristic 0. Double-check that it is connected and
+                # orientable.
+                if doubleSurf.isOrientable() and doubleSurf.isConnected():
+                    tori.append(doubleSurf)
+                else:
+                    raise ValueError( "Unexpected double of Klein bottle." )
+            continue
         if not s.isOrientable():
             # The surface s is bounded and non-orientable. If it is a Mobius
             # band, then we need to double it.
@@ -235,33 +251,40 @@ def isFibre(edge):
     # drill out a regular fibre instead? If so, then we must have at least
     # three "other pieces" that form Seifert fibre spaces over the disc with
     # two exceptional fibres.
+    if len(tori) < 3:
+        # If we drilled out a regular fibre, then we should have three
+        # essential tori.
+        # TODO Check this.
+        return Fibre.NONFIBRE
     goodOtherCount = 0
     for other in otherPieces:
         # Retriangulate with height 0 (single-threaded), and see if we can
         # recognise this other piece as a Seifert fibre space.
-        classifications = []
-        if other.retriangulate( 0, 1, recognise ):
-            # This other piece is definitely a Seifert fibre space.
-            if len(classifications) != 1:
-                raise ValueError(
-                        "Wrong number of classifications: {}".format(
-                            classifications ) )
-            c = classifications[0]
-            if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
-                # The current "other piece" is good.
-                goodOtherCount += 1
-                continue
-            elif c is SFS.DISCTHREE:
-                # We cannot conclude anything in this case.
-                continue
-            elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
-                # We cannot get this if we drilled out a Seifert fibre.
-                # TODO Check this.
-                return Fibre.NONFIBRE
-            else:
-                raise ValueError(
-                        "Should never recognise something as {} {}".format(
-                            c, "after cutting" ) )
+#        classifications = []
+#        if other.retriangulate( 0, 1, recognise ):
+#            # This other piece is definitely a Seifert fibre space.
+#            if len(classifications) != 1:
+#                raise ValueError(
+#                        "Wrong number of classifications: {}".format(
+#                            classifications ) )
+#            c = classifications[0]
+#            if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
+#                # The current "other piece" is good.
+#                # TODO Test.
+#                #goodOtherCount += 1
+#                #continue
+#                pass
+#            elif c is SFS.DISCTHREE:
+#                # We cannot conclude anything in this case.
+#                continue
+#            elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
+#                # We cannot get this if we drilled out a Seifert fibre.
+#                # TODO Check this.
+#                return Fibre.NONFIBRE
+#            else:
+#                raise ValueError(
+#                        "Should never recognise something as {} {}".format(
+#                            c, "after cutting" ) )
 
         # Now try looking at normal surfaces in this other piece.
         cutSurfs = NormalSurfaces.enumerate( other, NS_STANDARD )
@@ -521,6 +544,15 @@ if __name__ == "__main__":
 #        print( sig, name )
 #        for tri, i, name in genEdges(sig):
 #            msg = "    " + name + ": {}"
+#            fibreType = isFibre( tri.edge(i) )
+#            print( msg.format( fibreType.name ) )
+#            stdout.flush()
+
+#    for sig, name in tests:
+#        print()
+#        print( sig, name )
+#        for tri, i, name in genEdges(sig):
+#            msg = "    " + name + ": {}"
 #            try:
 #                fibreType = isFibre( tri.edge(i) )
 #            except ValueError as err:
@@ -584,6 +616,12 @@ if __name__ == "__main__":
 #            "oLLLwwAPPQccdgfhkilmkmlnnnhshacqaacnccxhu",
 #            "oLLLMwLPAQccdgfghkjkmllmnnhshagcabrcoobej",
 #            "oLLLMwLQwQccdgfghilklkmmnnhshagciaccwaarj" ]
+#            "oLLvMvMQQMccdfgilkljkjmmnnhsegspmimddggpw",
+#            "oLLvvLQPQQccdimjkhnmnllmlnhsvasantlauuusr",
+#            "oLLvvLQPQQccdimkkhnmlllnmnhsvaaantlpuuuur",
+#            "oLLLwvAPQQccdgfhijklnmnmnmhshesadccjcvcnk",
+#            "oLLvLLAAQQccdgiljhmnkklmnnhsgvasndhuuubnn" ]
+
     for sig in noExcFibres:
         print()
         tri = Triangulation3.fromIsoSig(sig)
