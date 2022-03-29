@@ -26,6 +26,7 @@ class SFS(Enum):
     DISCMOBIUS = auto() # SFS over disc that also fibres over Mobius band.
     DISCTWO = auto()    # SFS over disc, class bo1; 2 exceptional fibres.
     DISCTHREE = auto()  # SFS over disc, class bo1; 3 exceptional fibres.
+    ANNULUSONE = auto() # SFS over annulus, class bo1; 1 exceptional fibre.
 
 
 def recogniseSFS(tri):
@@ -40,8 +41,10 @@ def recogniseSFS(tri):
     --> Seifert fibre spaces of class bo1 over the disc, with two
         exceptional fibres;
     --> Seifert fibre spaces of class bo1 over the disc with three
-        exceptional fibres; and
+        exceptional fibres;
     --> Seifert fibre spaces of class bn2 over the Mobius band with one
+        exceptional fibre; and
+    --> Seifert fibre spaces of class bo1 over the annulus, with one
         exceptional fibre.
     Note that there is exactly one Seifert fibre space over the disc that
     also fibres over the Mobius band; this has class bo1 and two exceptional
@@ -56,12 +59,23 @@ def recogniseSFS(tri):
     if blocked is None:
         return SFS.UNKNOWN
     sfs = blocked.manifold()
-    if sfs.punctures() != 1:
-        # Definitely not fibred over the disc or the Mobius band.
+    punctures = sfs.punctures()
+    baseClass = sfs.baseClass()
+    baseGenus = sfs.baseGenus()
+    fibreCount = sfs.fibreCount()
+    if punctures == 2:
+        # Are we fibred over the annulus, class bo1, with one exceptional
+        # fibre?
+        if baseClass == SFSpace.bo1 and baseGenus == 0 and fibreCount == 1:
+            return SFS.ANNULUSONE
+        else:
+            return SFS.OTHERSFS
+    elif punctures != 1:
+        # Definitely not fibred over the disc, annulus or Mobius band.
         return SFS.OTHERSFS
-    if sfs.baseClass() == SFSpace.bo1 and sfs.baseGenus() == 0:
+    elif baseClass == SFSpace.bo1 and baseGenus == 0:
         # Fibred over disc, class bo1.
-        if sfs.fibreCount() == 2:
+        if fibreCount == 2:
             # When we have two exceptional fibres, we could also be fibred
             # over the Mobius band.
             if ( sfs.fibre(0).alpha == 2 and sfs.fibre(0).beta == 1 and
@@ -69,15 +83,15 @@ def recogniseSFS(tri):
                 return SFS.DISCMOBIUS
             else:
                 return SFS.DISCTWO
-        elif sfs.fibreCount() == 3:
+        elif fibreCount == 3:
             return SFS.DISCTHREE
         else:
             return SFS.OTHERSFS
-    elif sfs.baseClass() == SFSpace.bn2 and sfs.baseGenus() == 1:
+    elif baseClass == SFSpace.bn2 and baseGenus == 1:
         # Fibred over Mobius band, class bn2.
-        if sfs.fibreCount() == 0:
+        if fibreCount == 0:
             return SFS.DISCMOBIUS
-        elif sfs.fibreCount() == 1:
+        elif fibreCount == 1:
             return SFS.MOBIUSONE
         else:
             return SFS.OTHERSFS
@@ -104,96 +118,111 @@ def isFibre(edge):
     if drilled.hasStrictAngleStructure():
         return Fibre.NONFIBRE
 
-    # Now truncate, and see whether we can prove that the edge is isotopic to
-    # a Seifert fibre using combinatorial recognition.
+    # Now truncate, which corresponds to drilling out the edge that we
+    # pinched. If this edge was isotopic to a Seifert fibre, then the
+    # truncated triangulation will be a Seifert fibre space over the disc
+    # with either two or three exceptional fibres. Thus, we can certify that
+    # we did not drill out a Seifert fibre if we can prove that the truncated
+    # triangulation is not a Seifert fibre space of the correct type.
     drilled.idealToFinite()
     drilled.intelligentSimplify()
     drilled.intelligentSimplify()
     # Retriangulate with height 0 (single-threaded), and see if we can ever
     # recognise the drilled triangulation as a Seifert fibre space.
-#    classifications = []
-#    def recognise( sig, tri ):
-#        c = recogniseSFS(tri)
-#        if c is SFS.UNKNOWN:
-#            # We don't know if we have a Seifert fibre space.
-#            return False
-#        elif c is SFS.NOTSFS:
-#            # Combinatorial recognition should never be able to prove that
-#            # tri is not a Seifert fibre space.
-#            raise ValueError( "Recognised {}".format(c) )
-#        # We definitely have a Seifert fibre space.
-#        classifications.append(c)
-#        return True
-#    if drilled.retriangulate( 0, 1, recognise ):
-#        # The drilled triangulation is definitely a Seifert fibre space.
-#        if len(classifications) != 1:
-#            raise ValueError( "Wrong number of classifications: {}".format(
-#                classifications ) )
-#        c = classifications[0]
-#        if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
-#            # TODO Test.
-#            #return Fibre.EXCEPTIONAL
-#            pass
-#        elif c is SFS.DISCTHREE:
-#            # TODO Test.
-#            #return Fibre.REGULAR
-#            print( "        Combinatorial recognition says REGULAR." )
-#            pass
-#        elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
-#            return Fibre.NONFIBRE
-#        else:
-#            raise ValueError(
-#                    "Should never recognise something as {}".format(c) )
+    classifications = []
+    def recognise( sig, tri ):
+        c = recogniseSFS(tri)
+        if c is SFS.UNKNOWN:
+            # We don't know if we have a Seifert fibre space.
+            return False
+        elif c is SFS.NOTSFS:
+            # Combinatorial recognition should never be able to prove that
+            # tri is not a Seifert fibre space.
+            raise ValueError( "Recognised {}".format(c) )
+        # We definitely have a Seifert fibre space.
+        classifications.append(c)
+        return True
+    if drilled.retriangulate( 0, 1, recognise ):
+        # The drilled triangulation is definitely a Seifert fibre space.
+        if len(classifications) != 1:
+            raise ValueError( "Wrong number of classifications: {}".format(
+                classifications ) )
+        c = classifications[0]
+        if c in { SFS.DISCMOBIUS, SFS.DISCTWO, SFS.DISCTHREE }:
+            return Fibre.UNKNOWN
+        elif c in { SFS.OTHERSFS, SFS.MOBIUSONE }:
+            return Fibre.NONFIBRE
+        else:
+            raise ValueError(
+                    "Unexpected {}".format(c) )
 
-    # Fast tests have failed us. Try looking at normal surfaces.
-    # Look for essential annuli. By Corollary 6.8 of "Algorithms for the
-    # complete decomposition of a closed 3-manifold" (Jaco and Tollefson,
-    # 1995), such annuli are guaranteed to appear either as a two-sided
-    # vertex normal surface or as the double of a one-sided vertex normal
-    # surface (the latter case is necessary because Jaco and Tollefson do not
-    # consider one-sided surfaces to be vertex surfaces).
+    # Fast tests have failed us. Try looking at embedded surfaces:
+    #   --> If the drilled triangulation is fibred over the disc with either
+    #       two or three exceptional fibres, then it doesn't contain a
+    #       compressing disc. Thus, finding such a disc would tell us that we
+    #       didn't drill out a Seifert fibre.
+    #   --> If the drilled triangulation is fibred over the disc with two
+    #       exceptional fibres, then there is an essential annulus that cuts
+    #       the triangulation into two solid tori. Thus, showing that no such
+    #       annulus exists would tell us that we didn't drill out an
+    #       exceptional fibre.
+    #   --> If the drilled triangulation is fibred over the disc with three
+    #       exceptional fibres, then there exist:
+    #       (a) three essential annuli, each of which cuts the triangulation
+    #           into a solid torus and a Seifert fibre space over the disc
+    #           with two exceptional fibres; and
+    #       (b) three essential tori, each of which cuts the triangulation
+    #           a Seifert fibre space over the disc with two exceptional
+    #           fibres and a Seifert fibre space over the disc with one
+    #           exceptional fibre.
+    # We use the following facts, which are consequences of various results
+    # from Section 6 of the paper "Algorithms for the complete decomposition
+    # of a closed 3-manifold" (Jaco and Tollefson, 1995):
+    #   --> Since our drilled triangulation is guaranteed to represent a
+    #       compact and irreducible 3-manifold, we know that if it has a
+    #       compressing disc then at least one such disc must appear among
+    #       the vertex normal surfaces.
+    #   --> Since the Seifert fibre spaces of interest are orientable,
+    #       compact, irreducible and boundary-irreducible, we know that at
+    #       least one of the essential annuli of interest must appear as
+    #       either: a vertex normal annulus, or the double of a vertex normal
+    #       Mobius band.
+    #   --> Similarly, in the Seifert fibre spaces of interest, we know that
+    #       at least two of the essential tori of interest must appear as
+    #       either: a vertex normal torus, or the double of a vertex normal
+    #       Klein bottle.
     surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
     annuli = []
     tori = []
     for s in surfs:
         euler = s.eulerChar()
         if not s.hasRealBoundary():
-            # TODO Experiment with tori.
+            # Is s a torus? What about its double?
             if euler != 0:
                 continue
             if s.isOrientable():
-                # We have a torus.
+                # We have a torus (but ignore it if it is obviously trivial).
                 if s.isThinEdgeLink()[0] is None:
                     tori.append(s)
             else:
-                # We have a Klein bottle. We need to double it.
+                # We have a Klein bottle. Double it (we should get a torus,
+                # but do some sanity checks).
                 doubleSurf = s.doubleSurface()
-                # We know for sure that doubleSurf is closed and has Euler
-                # characteristic 0. Double-check that it is connected and
-                # orientable.
                 if doubleSurf.isOrientable() and doubleSurf.isConnected():
                     tori.append(doubleSurf)
                 else:
-                    raise ValueError( "Unexpected double of Klein bottle." )
-            continue
-        if not s.isOrientable():
-            # The surface s is bounded and non-orientable. If it is a Mobius
-            # band, then we need to double it.
+                    raise ValueError( "Unexpected double of Klein bottle" )
+        elif not s.isOrientable():
+            # Is the double of s an annulus?
             if euler != 0:
                 continue
             doubleSurf = s.doubleSurface()
-            # We know for sure that doubleSurf has real boundary and has
-            # Euler characteristic 0. We just need to check that it is
-            # connected and orientable.
             if doubleSurf.isOrientable() and doubleSurf.isConnected():
                 annuli.append(doubleSurf)
             else:
-                raise ValueError( "Unexpected double of Mobius band." )
-            continue
-        if euler == 1:
-            # The surface s is a disc. Determine whether it is a compressing
-            # disc by cutting along s and checking whether the torus boundary
-            # gets compressed down to a single sphere boundary.
+                raise ValueError( "Unexpected double of Mobius band" )
+        elif euler == 1:
+            # Is s a compressing disc?
             compress = s.cutAlong()
             compress.intelligentSimplify()
             compress.intelligentSimplify()
@@ -207,24 +236,16 @@ def isFibre(edge):
         # The drilled triangulation has no essential annuli, so we cannot
         # have drilled out a Seifert fibre.
         return Fibre.NONFIBRE
-    # We are looking for an annulus that either:
-    #   --> cuts the drilled triangulation into two solid tori (in which case
-    #       we know that we drilled out an exceptional fibre); or
-    #   --> cuts the drilled triangulation into a solid torus and a Seifert
-    #       fibre space over the disc with 2 exceptional fibres (in which
-    #       case we possibly cannot determine whether we drilled out a
-    #       Seifert fibre).
-    # If we never find such an annulus, then we definitely did not drill out
-    # a Seifert fibre.
+
+    # If none of the annuli cut the drilled triangulation into two solid
+    # tori, then we definitely didn't drill out an exceptional fibre. While
+    # we check this, also pay attention to annuli that cut the drilled
+    # triangulation into two pieces of which only one is a solid torus, since
+    # this could tell us whether we drilled out a regular fibre.
     otherPieces = []
     for a in annuli:
-        # Try cutting along the annulus a. If this causes the drilled
-        # triangulation to fall apart into two solid tori, then we know that
-        # we drilled out an exceptional fibre.
         cut = a.cutAlong()
         if cut.countComponents() != 2:
-            # Cutting along a only yields one piece, so it isn't the annulus
-            # we're looking for. Move along to the next annulus.
             continue
         notSolidTorus = []
         for comp in cut.triangulateComponents():
@@ -234,55 +255,39 @@ def isFibre(edge):
                 notSolidTorus.append(comp)
         nonSolidTorusCount = len(notSolidTorus)
         if nonSolidTorusCount == 0:
-            return Fibre.EXCEPTIONAL
-        elif nonSolidTorusCount == 2:
-            # Cutting along a doesn't yield any solid torus pieces, so it
-            # isn't the annulus we're looking for. Move along.
-            continue
+            return Fibre.UNKNOWN
+        elif nonSolidTorusCount == 1:
+            otherPieces.append( notSolidTorus[0] )
 
-        # Getting to this point means that cutting along a yields two pieces,
-        # exactly one of which is a solid torus. Deal with the other piece
-        # later.
-        otherPieces.append( notSolidTorus[0] )
-
-    # We definitely didn't drill out an exceptional fibre. Did we perhaps
-    # drill out a regular fibre instead? If so, then we must have at least
-    # three "other pieces" that form Seifert fibre spaces over the disc with
-    # two exceptional fibres.
-    if len(tori) < 3:
-        # If we drilled out a regular fibre, then we should have three
-        # essential tori.
-        # TODO Check this.
+    # We didn't drill out an exceptional fibre, but did we perhaps drill out
+    # a regular fibre instead?
+    if len(tori) < 2:
+        # As mentioned above, we must find at least two essential tori among
+        # the vertex normal surfaces.
         return Fibre.NONFIBRE
-    goodOtherCount = 0
+
+    # If we drilled out a regular fibre, at least one of the other pieces
+    # must be fibred over the disc with two exceptional fibres.
+    foundOther = False
     for other in otherPieces:
-        # Retriangulate with height 0 (single-threaded), and see if we can
-        # recognise this other piece as a Seifert fibre space.
-#        classifications = []
-#        if other.retriangulate( 0, 1, recognise ):
-#            # This other piece is definitely a Seifert fibre space.
-#            if len(classifications) != 1:
-#                raise ValueError(
-#                        "Wrong number of classifications: {}".format(
-#                            classifications ) )
-#            c = classifications[0]
-#            if ( c is SFS.DISCMOBIUS ) or ( c is SFS.DISCTWO ):
-#                # The current "other piece" is good.
-#                # TODO Test.
-#                #goodOtherCount += 1
-#                #continue
-#                pass
-#            elif c is SFS.DISCTHREE:
-#                # We cannot conclude anything in this case.
-#                continue
-#            elif ( c is SFS.OTHERSFS ) or ( c is SFS.MOBIUSONE ):
-#                # We cannot get this if we drilled out a Seifert fibre.
-#                # TODO Check this.
-#                return Fibre.NONFIBRE
-#            else:
-#                raise ValueError(
-#                        "Should never recognise something as {} {}".format(
-#                            c, "after cutting" ) )
+        # Start with combinatorial recognition.
+        classifications = []
+        if other.retriangulate( 0, 1, recognise ):
+            # This other piece is definitely a Seifert fibre space.
+            if len(classifications) != 1:
+                raise ValueError(
+                        "Wrong number of classifications: {}".format(
+                            classifications ) )
+            c = classifications[0]
+            if c in { SFS.DISCMOBIUS, SFS.DISCTWO }:
+                # Found a piece of the required type.
+                foundOther = True
+                break
+            elif c in { SFS.DISCTHREE, SFS.OTHERSFS, SFS.MOBIUSONE }:
+                continue
+            else:
+                raise ValueError(
+                        "Unexpected {}".format(c) )
 
         # Now try looking at normal surfaces in this other piece.
         cutSurfs = NormalSurfaces.enumerate( other, NS_STANDARD )
@@ -293,24 +298,16 @@ def isFibre(edge):
                 continue
             euler = s.eulerChar()
             if not s.isOrientable():
-                # The surface is bounded and non-orientable. If it is a
-                # Mobius band, then we need to double it.
+                # Is the double of s an annulus?
                 if euler != 0:
                     continue
                 doubleSurf = s.doubleSurface()
-                # We know for sure that doubleSurf has real boundary and has
-                # Euler characteristic 0. We just need to check that it is
-                # connected and orientable.
                 if doubleSurf.isOrientable() and doubleSurf.isConnected():
                     cutAnnuli.append(doubleSurf)
                 else:
-                    raise ValueError( "Unexpected double of Mobius band." )
-                continue
-            if euler == 1:
-                # The surface s is a disc. Determine whether it is a
-                # compressing disc by cutting along s and checking whether
-                # the torus boundary gets compressed down to a single sphere
-                # boundary.
+                    raise ValueError( "Unexpected double of Mobius band" )
+            elif euler == 1:
+                # Is s a compressing disc?
                 compress = s.cutAlong()
                 compress.intelligentSimplify()
                 compress.intelligentSimplify()
@@ -322,36 +319,207 @@ def isFibre(edge):
                 if s.isThinEdgeLink()[0] is None:
                     cutAnnuli.append(s)
         if hasCompress or not cutAnnuli:
-            # We have a compressing disc, or we don't have any annuli. In
-            # either case, the annulus a isn't the one we're looking for.
-            # Move along.
+            # The required piece should have no compressing discs and at
+            # least one vertex normal essential annulus.
             continue
         for aa in cutAnnuli:
-            # Try cutting along aa.
+            # Does cutting along aa give two solid tori?
             c = aa.cutAlong()
             if c.countComponents() != 2:
-                # Cutting along aa only yields one piece, so it isn't the
-                # annulus we're looking for. Move along.
                 continue
             onlySolidTori = True
             for cc in c.triangulateComponents():
                 cc.intelligentSimplify()
                 cc.intelligentSimplify()
                 if not cc.isSolidTorus():
-                    # Cutting along aa doesn't yield two solid tori, so it
-                    # isn't the annulus we're looking for. Move along.
                     onlySolidTori = False
                     break
             if onlySolidTori:
-                # The current "other piece" is good.
-                goodOtherCount += 1
-                continue
-
-    # Did we find enough "other pieces" that were good?
-    if goodOtherCount < 3:
+                # Found a piece of the required type.
+                foundOther = True
+                break
+        if foundOther:
+            break
+    if not foundOther:
+        # We did not find a piece of the required type, so we could not have
+        # drilled out a regular fibre.
         return Fibre.NONFIBRE
-    else:
-        return Fibre.UNKNOWN
+
+    # We are still not sure whether we drilled out a regular fibre. We use
+    # one final test: if we did drill out a regular fibre, then we have at
+    # least two vertex normal essential tori that cut the drilled
+    # triangulation into:
+    #   --> a Seifert fibre space over the disc with two exceptional fibres;
+    #       and
+    #   --> a Seifert fibre space over the annulus with one exceptional
+    #       fibre.
+    torusCount = 0
+    for t in tori:
+        cut = t.cutAlong()
+        if cut.countComponents() != 2:
+            continue
+        foundDiscPiece = False
+        foundAnnulusPiece = False
+        for piece in cut.triangulateComponents():
+            piece.intelligentSimplify()
+            piece.intelligentSimplify()
+            bdries = piece.countBoundaryComponents()
+            if bdries == 1:
+                # Is this piece the required Seifert fibre space over the
+                # disc? Start with combinatorial recognition.
+                classifications = []
+                if piece.retriangulate( 0, 1, recognise ):
+                    # This piece is definitely a Seifert fibre space.
+                    if len(classifications) != 1:
+                        raise ValueError(
+                                "Wrong number of classifications: {}".format(
+                                    classifications ) )
+                    c = classifications[0]
+                    if c in { SFS.DISCMOBIUS, SFS.DISCTWO }:
+                        foundDiscPiece = True
+                        continue
+                    elif c in { SFS.DISCTHREE, SFS.OTHERSFS, SFS.MOBIUSONE }:
+                        break
+                    else:
+                        raise ValueError(
+                                "Unexpected {}".format(c) )
+
+                # Now try looking at normal surfaces in this piece.
+                cutSurfs = NormalSurfaces.enumerate( piece, NS_STANDARD )
+                cutAnnuli = []
+                hasCompress = False
+                for s in cutSurfs:
+                    if not s.hasRealBoundary():
+                        continue
+                    euler = s.eulerChar()
+                    if not s.isOrientable():
+                        # Is the double of s an annulus?
+                        if euler != 0:
+                            continue
+                        doubleSurf = s.doubleSurface()
+                        if ( doubleSurf.isOrientable() and
+                                doubleSurf.isConnected() ):
+                            cutAnnuli.append(doubleSurf)
+                        else:
+                            raise ValueError(
+                                    "Unexpected double of Mobius band" )
+                    elif euler == 1:
+                        # Is s a compressing disc?
+                        co = s.cutAlong()
+                        co.intelligentSimplify()
+                        co.intelligentSimplify()
+                        if ( co.countBoundaryComponents() == 1 and
+                                co.boundaryComponent(0).eulerChar() == 2 ):
+                            hasCompress = True
+                            break
+                    elif euler == 0:
+                        if s.isThinEdgeLink()[0] is None:
+                            cutAnnuli.append(s)
+                if hasCompress or not cutAnnuli:
+                    # The required piece should have no compressing discs and
+                    # at least one vertex normal essential annulus.
+                    continue
+                for aa in cutAnnuli:
+                    # Does cutting along aa give two solid tori?
+                    c = aa.cutAlong()
+                    if c.countComponents() != 2:
+                        continue
+                    onlySolidTori = True
+                    for cc in c.triangulateComponents():
+                        cc.intelligentSimplify()
+                        cc.intelligentSimplify()
+                        if not cc.isSolidTorus():
+                            onlySolidTori = False
+                            break
+                    if onlySolidTori:
+                        # Found a piece of the required type.
+                        foundDiscPiece = True
+                        break
+            elif bdries == 2:
+                # Is this piece the required Seifert fibre space over the
+                # annulus? Start with combinatorial recognition.
+                classifications = []
+                if piece.retriangulate( 0, 1, recognise ):
+                    # This piece is definitely a Seifert fibre space.
+                    if len(classifications) != 1:
+                        raise ValueError(
+                                "Wrong number of classifications: {}".format(
+                                    classifications ) )
+                    c = classifications[0]
+                    if c is SFS.ANNULUSONE:
+                        foundAnnulusPiece = True
+                        continue
+                    elif c is SFS.OTHERSFS:
+                        break
+                    else:
+                        raise ValueError(
+                                "Unexpected {}".format(c) )
+
+                # Now try looking at normal surfaces in this piece.
+                cutSurfs = NormalSurfaces.enumerate( piece, NS_STANDARD )
+                cutAnnuli = []
+                hasCompress = False
+                for s in cutSurfs:
+                    if not s.hasRealBoundary():
+                        continue
+                    euler = s.eulerChar()
+                    if not s.isOrientable():
+                        # Is the double of s an annulus?
+                        if euler != 0:
+                            continue
+                        doubleSurf = s.doubleSurface()
+                        if ( doubleSurf.isOrientable() and
+                                doubleSurf.isConnected() ):
+                            cutAnnuli.append(doubleSurf)
+                        else:
+                            raise ValueError(
+                                    "Unexpected double of Mobius band" )
+                    elif euler == 1:
+                        # Is s a compressing disc?
+                        co = s.cutAlong()
+                        co.intelligentSimplify()
+                        co.intelligentSimplify()
+                        if co.countBoundaryComponents() != 2:
+                            continue
+                        for b in co.boundaryComponents():
+                            if b.eulerChar() == 2:
+                                hasCompress = True
+                                break
+                        if hasCompress:
+                            break
+                    elif euler == 0:
+                        if s.isThinEdgeLink()[0] is None:
+                            cutAnnuli.append(s)
+                if hasCompress or not cutAnnuli:
+                    # The required piece should have no compressing discs and
+                    # at least one vertex normal essential annulus.
+                    continue
+                for aa in cutAnnuli:
+                    # Does cutting along aa give a single solid torus?
+                    c = aa.cutAlong()
+                    if c.countComponents() != 1:
+                        continue
+                    if c.isSolidTorus():
+                        # Found a piece of the required type.
+                        foundAnnulusPiece = True
+                        break
+            else:
+                raise ValueError(
+                        "Piece with {} boundary components".format(bdries) )
+
+        # Did cutting along t give two pieces of the required types?
+        if foundDiscPiece and foundAnnulusPiece:
+            torusCount += 1
+        if torusCount == 2:
+            break
+    if torusCount < 2:
+        # We did not find two tori of the required type, so we could not have
+        # drilled out a regular fibre.
+        return Fibre.NONFIBRE
+
+    # If we survived to this point, then nothing we did could rule out the
+    # possibility that we drilled out a regular fibre.
+    return Fibre.UNKNOWN
 
 
 def isExceptionalFibre(edge):
@@ -623,6 +791,7 @@ if __name__ == "__main__":
             "nLvvAAwQQkcgfhjjlmkmkjlmhahgooatptigof" ]
 #            "oLLvLLLQQQccdgimlmlkkjnknnhsgvtptiipolpof",
 #            "oLLvLMLPQQccdgjimmnkljknnmhsgcviihttoeggo" ]
+#            "oLLvMvAQQPccdfgilkmjmjllnnhsegstmhmqdffdk" ]
 
     for sig in noExcFibres:
         print()
