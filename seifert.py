@@ -223,10 +223,10 @@ def isFibre(edge):
 
     # Now truncate, which corresponds to drilling out the edge that we
     # pinched. If this edge was isotopic to a Seifert fibre, then the
-    # truncated triangulation will be a Seifert fibre space over the disc
-    # with either two or three exceptional fibres. Thus, we can certify that
-    # we did not drill out a Seifert fibre if we can prove that the truncated
-    # triangulation is not a Seifert fibre space of the correct type.
+    # drilled triangulation will be a Seifert fibre space over the disc with
+    # either two or three exceptional fibres. Our goal is to show that the
+    # drilled triangulation is not a Seifert fibre space of the correct type,
+    # and hence that we did not drill out a Seifert fibre.
     drilled.idealToFinite()
     drilled.intelligentSimplify()
     drilled.intelligentSimplify()
@@ -252,18 +252,24 @@ def isFibre(edge):
                 classifications ) )
         c = classifications[0]
         if c in { SFS.DISCMOBIUS, SFS.DISCTWO, SFS.DISCTHREE }:
+            # The drilled triangulation is a Seifert fibre space of the
+            # correct type, so we cannot rule out the possibility that we
+            # drilled out a Seifert fibre.
             return Fibre.UNKNOWN
         elif c in { SFS.OTHERSFS, SFS.MOBIUSONE }:
+            # The drilled triangulation is a Seifert fibre space, but not of
+            # the correct type, so we definitely didn't drill out a Seifert
+            # fibre.
             return Fibre.NONFIBRE
         else:
             raise ValueError(
                     "Unexpected {}".format(c) )
 
     # Fast tests have failed us. Try looking at embedded surfaces:
-    #   --> If the drilled triangulation is fibred over the disc with either
-    #       two or three exceptional fibres, then it doesn't contain a
-    #       compressing disc. Thus, finding such a disc would tell us that we
-    #       didn't drill out a Seifert fibre.
+    #   --> If the drilled triangulation is a Seifert fibre space of the
+    #       correct type, then it cannot contain a compressing disc. Thus,
+    #       finding such a disc tells us that we didn't drill out a Seifert
+    #       fibre.
     #   --> If the drilled triangulation is fibred over the disc with two
     #       exceptional fibres, then there is an essential annulus that cuts
     #       the triangulation into two solid tori. Thus, showing that no such
@@ -331,6 +337,8 @@ def isFibre(edge):
             compress.intelligentSimplify()
             if ( compress.countBoundaryComponents() == 1 and
                     compress.boundaryComponent(0).eulerChar() == 2 ):
+                # Found a compressing disc in the drilled triangulation. This
+                # means that we didn't drill out a Seifert fibre.
                 return Fibre.NONFIBRE
         elif euler == 0:
             if s.isThinEdgeLink()[0] is None:
@@ -350,6 +358,9 @@ def isFibre(edge):
         cut = a.cutAlong()
         if cut.countComponents() != 2:
             continue
+
+        # Cutting along a decomposed the drilled triangulation into two
+        # pieces. How many of these pieces are solid tori?
         notSolidTorus = []
         for comp in cut.triangulateComponents():
             comp.intelligentSimplify()
@@ -358,8 +369,14 @@ def isFibre(edge):
                 notSolidTorus.append(comp)
         nonSolidTorusCount = len(notSolidTorus)
         if nonSolidTorusCount == 0:
+            # The drilled triangulation decomposes into two solid tori, so we
+            # cannot rule out the possibility that we drilled out an
+            # exceptional fibre.
             return Fibre.UNKNOWN
         elif nonSolidTorusCount == 1:
+            # We cut off a single solid torus from the drilled triangulation.
+            # The topology of the other piece could tell us whether we
+            # drilled out a regular fibre.
             otherPieces.append( notSolidTorus[0] )
 
     # We didn't drill out an exceptional fibre, but did we perhaps drill out
@@ -393,55 +410,10 @@ def isFibre(edge):
                         "Unexpected {}".format(c) )
 
         # Now try looking at normal surfaces in this other piece.
-        cutSurfs = NormalSurfaces.enumerate( other, NS_STANDARD )
-        cutAnnuli = []
-        hasCompress = False
-        for s in cutSurfs:
-            if not s.hasRealBoundary():
-                continue
-            euler = s.eulerChar()
-            if not s.isOrientable():
-                # Is the double of s an annulus?
-                if euler != 0:
-                    continue
-                doubleSurf = s.doubleSurface()
-                if doubleSurf.isOrientable() and doubleSurf.isConnected():
-                    cutAnnuli.append(doubleSurf)
-                else:
-                    raise ValueError( "Unexpected double of Mobius band" )
-            elif euler == 1:
-                # Is s a compressing disc?
-                compress = s.cutAlong()
-                compress.intelligentSimplify()
-                compress.intelligentSimplify()
-                if ( compress.countBoundaryComponents() == 1 and
-                        compress.boundaryComponent(0).eulerChar() == 2 ):
-                    hasCompress = True
-                    break
-            elif euler == 0:
-                if s.isThinEdgeLink()[0] is None:
-                    cutAnnuli.append(s)
-        if hasCompress or not cutAnnuli:
-            # The required piece should have no compressing discs and at
-            # least one vertex normal essential annulus.
-            continue
-        for aa in cutAnnuli:
-            # Does cutting along aa give two solid tori?
-            c = aa.cutAlong()
-            if c.countComponents() != 2:
-                continue
-            onlySolidTori = True
-            for cc in c.triangulateComponents():
-                cc.intelligentSimplify()
-                cc.intelligentSimplify()
-                if not cc.isSolidTorus():
-                    onlySolidTori = False
-                    break
-            if onlySolidTori:
-                # Found a piece of the required type.
-                foundOther = True
-                break
-        if foundOther:
+        if cutTwoSolidTori(other):
+            # We found a boundary-irreducible piece that can be decomposed
+            # into two solid tori by cutting along an essential annulus.
+            foundOther = True
             break
     if not foundOther:
         # We did not find a piece of the required type, so we could not have
@@ -517,7 +489,8 @@ def isFibre(edge):
                 raise ValueError(
                         "Piece with {} boundary components".format(bdries) )
 
-        # Did cutting along t give two pieces of the required types?
+        # Did cutting along t give two pieces of the required types? If so,
+        # then t is one of the two tori of the required type.
         if foundDiscPiece and foundAnnulusPiece:
             torusCount += 1
         if torusCount == 2:
