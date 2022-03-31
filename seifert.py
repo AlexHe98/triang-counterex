@@ -99,6 +99,109 @@ def recogniseSFS(tri):
         return SFS.OTHERSFS
 
 
+def cutOneSolidTorus(tri):
+    """
+    Does the given triangulation represent a boundary-irreducible 3-manifold
+    that can be decomposed into a single solid torus by cutting along a
+    (non-separating) essential annulus?
+
+    Pre-conditions:
+    --> The given triangulation is an orientable and irreducible 3-manifold
+        with exactly two real torus boundary components (and no other
+        boundary components).
+    """
+    surfs = NormalSurfaces.enumerate( tri, NS_STANDARD )
+    annuli = []
+    for s in surfs:
+        if not s.hasRealBoundary():
+            continue
+        euler = s.eulerChar()
+        if not s.isOrientable():
+            # Is the double of s an annulus?
+            if euler != 0:
+                continue
+            doubleSurf = s.doubleSurface()
+            if doubleSurf.isOrientable() and doubleSurf.isConnected():
+                annuli.append(doubleSurf)
+            else:
+                raise ValueError( "Unexpected double of Mobius band" )
+        elif euler == 1:
+            # Is s a compressing disc?
+            compress = s.cutAlong()
+            compress.intelligentSimplify()
+            compress.intelligentSimplify()
+            if compress.countBoundaryComponents() != 2:
+                continue
+            for b in compress.boundaryComponents():
+                if b.eulerChar() == 2:
+                    return False
+        elif euler == 0:
+            if s.isThinEdgeLink()[0] is None:
+                annuli.append(s)
+    if not annuli:
+        return False
+    for a in annuli:
+        c = a.cutAlong()
+        if c.isSolidTorus():
+            return True
+    return False
+
+
+def cutTwoSolidTori(tri):
+    """
+    Does the given triangulation represent a boundary-irreducible 3-manifold
+    that can be decomposed into two solid tori by cutting along a
+    (separating) essential annulus?
+
+    Pre-conditions:
+    --> The given triangulation is an orientable and irreducible 3-manifold
+        with exactly one real torus boundary component (and no other boundary
+        components).
+    """
+    surfs = NormalSurfaces.enumerate( tri, NS_STANDARD )
+    annuli = []
+    for s in surfs:
+        if not s.hasRealBoundary():
+            continue
+        euler = s.eulerChar()
+        if not s.isOrientable():
+            # Is the double of s an annulus?
+            if euler != 0:
+                continue
+            doubleSurf = s.doubleSurface()
+            if doubleSurf.isOrientable() and doubleSurf.isConnected():
+                annuli.append(doubleSurf)
+            else:
+                raise ValueError( "Unexpected double of Mobius band" )
+        elif euler == 1:
+            # Is s a compressing disc?
+            compress = s.cutAlong()
+            compress.intelligentSimplify()
+            compress.intelligentSimplify()
+            if ( compress.countBoundaryComponents() == 1 and
+                    compress.boundaryComponent(0).eulerChar() == 2 ):
+                return False
+        elif euler == 0:
+            if s.isThinEdgeLink()[0] is None:
+                annuli.append(s)
+    if not annuli:
+        return False
+    for a in annuli:
+        c = a.cutAlong()
+        if c.countComponents() != 2:
+            continue
+        onlySolidTori = True
+        for cc in c.triangulateComponents():
+            cc.intelligentSimplify()
+            cc.intelligentSimplify()
+            if not cc.isSolidTorus():
+                onlySolidTori = False
+                break
+        if onlySolidTori:
+            return True
+    return False
+
+
 def isFibre(edge):
     """
     Assuming that the given edge belongs to a one-vertex triangulation of a
@@ -385,56 +488,8 @@ def isFibre(edge):
                                 "Unexpected {}".format(c) )
 
                 # Now try looking at normal surfaces in this piece.
-                cutSurfs = NormalSurfaces.enumerate( piece, NS_STANDARD )
-                cutAnnuli = []
-                hasCompress = False
-                for s in cutSurfs:
-                    if not s.hasRealBoundary():
-                        continue
-                    euler = s.eulerChar()
-                    if not s.isOrientable():
-                        # Is the double of s an annulus?
-                        if euler != 0:
-                            continue
-                        doubleSurf = s.doubleSurface()
-                        if ( doubleSurf.isOrientable() and
-                                doubleSurf.isConnected() ):
-                            cutAnnuli.append(doubleSurf)
-                        else:
-                            raise ValueError(
-                                    "Unexpected double of Mobius band" )
-                    elif euler == 1:
-                        # Is s a compressing disc?
-                        co = s.cutAlong()
-                        co.intelligentSimplify()
-                        co.intelligentSimplify()
-                        if ( co.countBoundaryComponents() == 1 and
-                                co.boundaryComponent(0).eulerChar() == 2 ):
-                            hasCompress = True
-                            break
-                    elif euler == 0:
-                        if s.isThinEdgeLink()[0] is None:
-                            cutAnnuli.append(s)
-                if hasCompress or not cutAnnuli:
-                    # The required piece should have no compressing discs and
-                    # at least one vertex normal essential annulus.
-                    continue
-                for aa in cutAnnuli:
-                    # Does cutting along aa give two solid tori?
-                    c = aa.cutAlong()
-                    if c.countComponents() != 2:
-                        continue
-                    onlySolidTori = True
-                    for cc in c.triangulateComponents():
-                        cc.intelligentSimplify()
-                        cc.intelligentSimplify()
-                        if not cc.isSolidTorus():
-                            onlySolidTori = False
-                            break
-                    if onlySolidTori:
-                        # Found a piece of the required type.
-                        foundDiscPiece = True
-                        break
+                if cutTwoSolidTori(piece):
+                    foundDiscPiece = True
             elif bdries == 2:
                 # Is this piece the required Seifert fibre space over the
                 # annulus? Start with combinatorial recognition.
@@ -456,53 +511,8 @@ def isFibre(edge):
                                 "Unexpected {}".format(c) )
 
                 # Now try looking at normal surfaces in this piece.
-                cutSurfs = NormalSurfaces.enumerate( piece, NS_STANDARD )
-                cutAnnuli = []
-                hasCompress = False
-                for s in cutSurfs:
-                    if not s.hasRealBoundary():
-                        continue
-                    euler = s.eulerChar()
-                    if not s.isOrientable():
-                        # Is the double of s an annulus?
-                        if euler != 0:
-                            continue
-                        doubleSurf = s.doubleSurface()
-                        if ( doubleSurf.isOrientable() and
-                                doubleSurf.isConnected() ):
-                            cutAnnuli.append(doubleSurf)
-                        else:
-                            raise ValueError(
-                                    "Unexpected double of Mobius band" )
-                    elif euler == 1:
-                        # Is s a compressing disc?
-                        co = s.cutAlong()
-                        co.intelligentSimplify()
-                        co.intelligentSimplify()
-                        if co.countBoundaryComponents() != 2:
-                            continue
-                        for b in co.boundaryComponents():
-                            if b.eulerChar() == 2:
-                                hasCompress = True
-                                break
-                        if hasCompress:
-                            break
-                    elif euler == 0:
-                        if s.isThinEdgeLink()[0] is None:
-                            cutAnnuli.append(s)
-                if hasCompress or not cutAnnuli:
-                    # The required piece should have no compressing discs and
-                    # at least one vertex normal essential annulus.
-                    continue
-                for aa in cutAnnuli:
-                    # Does cutting along aa give a single solid torus?
-                    c = aa.cutAlong()
-                    if c.countComponents() != 1:
-                        continue
-                    if c.isSolidTorus():
-                        # Found a piece of the required type.
-                        foundAnnulusPiece = True
-                        break
+                if cutOneSolidTorus(piece):
+                    foundAnnulusPiece = True
             else:
                 raise ValueError(
                         "Piece with {} boundary components".format(bdries) )
