@@ -49,6 +49,9 @@ def possibleFibre( edge ):
     """
     Returns True if we cannot rule out the possibility that the given edge is
     isotopic to a fibre in a small Seifert fibre space.
+
+    Note that this routine relies on normal surface theory, so it may be very
+    slow if the given edge belongs to a large triangulation.
     """
     RandomEngine.reseedWithHardware()
     fibreType = isFibre(edge)

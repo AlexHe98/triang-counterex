@@ -14,11 +14,7 @@ removes a tunnel edge, prioritising triangulations in which:
 (2) the maximum "degree defect" among tunnel edges is small (see the
     degDefect() routine); and
 (3) the number of tetrahedra is small.
-
-This is written to run with either Python 2 or Python 3, without needing to
-rewrite any code.
 """
-from __future__ import print_function
 from sys import argv, stdout
 from triangCounterexHelpers import isTunnel
 from removeBadEdge import removeBadEdge

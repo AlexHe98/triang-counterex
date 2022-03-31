@@ -105,7 +105,7 @@ def cutOneSolidTorus(tri):
     that can be decomposed into a single solid torus by cutting along a
     (non-separating) essential annulus?
 
-    Pre-conditions:
+    Pre-condition:
     --> The given triangulation is an orientable and irreducible 3-manifold
         with exactly two real torus boundary components (and no other
         boundary components).
@@ -153,7 +153,7 @@ def cutTwoSolidTori(tri):
     that can be decomposed into two solid tori by cutting along a
     (separating) essential annulus?
 
-    Pre-conditions:
+    Pre-condition:
     --> The given triangulation is an orientable and irreducible 3-manifold
         with exactly one real torus boundary component (and no other boundary
         components).

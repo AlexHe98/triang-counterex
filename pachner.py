@@ -29,14 +29,14 @@ def twoThree(triangle):
     preserves orientation.
 
     We do, however, ensure the following:
-    --- The last three tetrahedra in the returned triangulation are exactly
+    --> The last three tetrahedra in the returned triangulation are exactly
         the three tetrahedra that are created by the 2-3 move.
-    --- In each of these three tetrahedra, the newly-created edge appears
+    --> In each of these three tetrahedra, the newly-created edge appears
         as edge(0,1).
-    --- The order of the indices of these three tetrahedra respects the
+    --> The order of the indices of these three tetrahedra respects the
         vertex numbering of the given triangle in the original
         triangulation.
-    --- Moreover, walking from vertex 2 to vertex 3 of each of the new
+    --> Moreover, walking from vertex 2 to vertex 3 of each of the new
         tetrahedra corresponds to walking from vertex i of the given
         triangle to vertex i+1 (mod 3).
     """
@@ -248,13 +248,13 @@ def threeTwo(edge):
     preserves orientation.
 
     We do, however, ensure the following:
-    --- The last two tetrahedra in the returned triangulation are exactly
+    --> The last two tetrahedra in the returned triangulation are exactly
         the two tetrahedra that are created by the 3-2 move.
-    --- In each of these two tetrahedra, the newly-created triangle is the
+    --> In each of these two tetrahedra, the newly-created triangle is the
         the one with vertices numbered (0,1,2).
-    --- The order of the indices of these two tetrahedra respects the
+    --> The order of the indices of these two tetrahedra respects the
         vertex numbering of the given edge in the original triangulation.
-    --- Moreover, for i in {0,1,2}, walking from vertex i to vertex
+    --> Moreover, for i in {0,1,2}, walking from vertex i to vertex
         i+1 (mod 3) of either of the newly-created tetrahedra corresponds
         to walking through edge.embedding(i).simplex() in the direction
         from edge.embedding(i-1 (mod 3)).simplex() to
