@@ -12,8 +12,9 @@ from sys import stdout
 from timeit import default_timer
 from multiprocessing import Condition, Process
 from multiprocessing.managers import SyncManager
-from queue import Empty, PriorityQueue
+from queue import Empty
 from regina import *
+from search import SearchData
 from pachner import twoThree, threeTwo
 from triangCounterexHelpers import mulDefect
 from triangCounterexHelpers import degDefect
@@ -66,7 +67,7 @@ def complexity( tri, badEdges, excess=None ):
                 tri.size() )
 
 
-class RemoveBadEdgeData:
+class RemoveBadEdgeData(SearchData):
     """
     Stores all the data that needs to be shared between processes when
     running the removeBadEdge() routine.
@@ -75,20 +76,11 @@ class RemoveBadEdgeData:
         """
         Initialises shared search data.
 
-        Among other things, enqueues the initial isomorphism signature s.
+        Among other things, enqueues the initial isomorphism signature s, and
+        provides the isBad() routine for processes to use to test whether an
+        edge is bad.
         """
-        # Progress tracking.
-        self._start = default_timer()
-        self._previousInfo = self._start
-        self._interval = interval
-
-        # Number of processes currently running.
-        self._nRunning = nProcesses
-
-        # Details of all discovered isomorphism signatures.
-        self._total = 0
-        self._explored = 0
-        self._details = dict()
+        super().__init__( s, nProcesses, interval, isBad )
 
         # Initial triangulation.
         t = Triangulation3.fromIsoSig(s)
@@ -100,34 +92,15 @@ class RemoveBadEdgeData:
         self._minSig = { c[0]: s }
         self._current = s
 
-        # We can stop the computation as soon as we find a result.
-        self._stop = False
+        # The current number of bad edges is given by c[0]. Our target is to
+        # get below this number. Moreover, during our search, we never allow
+        # the number of bad edges to exceed c[0]+excess.
         self._target = c[0]
         self._maxBadEdges = self._target + excess
-        self._results = []
 
-        # Share isBad routine with all processes.
-        self._isBad = isBad
-
-        # Priority queue of isomorphism signatures to explore.
-        # Note that everything else needs to have been initialised before
-        # calling enqueue().
-        self._queue = PriorityQueue()
+        # Enqueue the initial isomorphism signature.
         self.enqueue( s, c, tuple(b),
-                None ) # Initial sig has no source.
-
-    def totalTime(self):
-        """
-        Returns the time elapsed since self was initialised.
-        """
-        return default_timer() - self._start
-
-    def getIsBadRoutine(self):
-        """
-        Returns a routine that takes a single edge as input and determines
-        whether this edge is bad.
-        """
-        return self._isBad
+                None ) # Initial iso sig has no source.
 
     def _minComplexity( self, badEdgeCount ):
         return self._details[ self._minSig[badEdgeCount] ][2]
@@ -140,7 +113,7 @@ class RemoveBadEdgeData:
         been discovered so far.
         """
         minFormat = " Min{}: {}, {}."
-        msg = ""
+        msg = super().info()
         for badEdgeCount in self._minSig:
             msg += minFormat.format(
                     badEdgeCount,
@@ -149,27 +122,7 @@ class RemoveBadEdgeData:
         msg += " Current: {}, {}.".format(
                 self._details[ self._current ][2],
                 self._current )
-        return "Time: {:.6f}. Seen: {}. Visited: {}.{}".format(
-                self.totalTime(), self._total, self._explored, msg )
-
-    def nRunning(self):
-        """
-        Returns the number of processes that are currently running (i.e.,
-        not paused).
-        """
-        return self._nRunning
-
-    def tellPaused(self):
-        """
-        Tells self that a process has paused.
-        """
-        self._nRunning -= 1
-
-    def tellResumed(self):
-        """
-        Tells self that a process has resumed.
-        """
-        self._nRunning += 1
+        return msg
 
     def _updateMinSig( self, sig, priority ):
         badEdgeCount = priority[0]
@@ -189,12 +142,6 @@ class RemoveBadEdgeData:
         """
         return self._maxBadEdges
 
-    def getResults(self):
-        """
-        Returns the (possibly empty) list of results.
-        """
-        return self._results
-
     def newResult( self, sig, priority, badEdges, source ):
         """
         Records the given sig as a new result, and instructs all processes
@@ -205,13 +152,6 @@ class RemoveBadEdgeData:
         self._updateMinSig( sig, priority )
         self._stop = True
 
-    def stop(self):
-        """
-        Checks whether the computation should be stopped because
-        self.getResults() is no longer empty.
-        """
-        return self._stop
-
     def badEdges( self, sig ):
         """
         Returns the tuple of bad edge indices in sig.
@@ -220,18 +160,6 @@ class RemoveBadEdgeData:
         --> The given sig was enqueued at some point in time.
         """
         return self._details[sig][0]
-
-    def alreadySeen( self, sig ):
-        """
-        Returns True if and only if the given sig has already been seen.
-        """
-        return sig in self._details
-
-    def queueEmpty(self):
-        """
-        Returns True if and only if the queue is currently empty.
-        """
-        return self._queue.empty()
 
     def enqueue( self, sig, priority, badEdges, source ):
         """
@@ -248,7 +176,7 @@ class RemoveBadEdgeData:
 
     def dequeue(self):
         """
-        Prints some info is a lot of time has passed, and then pops the
+        Prints some info if a lot of time has passed, and then pops the
         isomorphism signature with the highest priority from the queue.
 
         Exceptions:
@@ -346,7 +274,6 @@ def removeBadEdgeExplore_(
         need to access shared.
     """
     tri = Triangulation3.fromIsoSig(sig)
-    tetCount = tri.size()
     with lock:
         badEdges = shared.badEdges(sig)
         target = shared.target()
