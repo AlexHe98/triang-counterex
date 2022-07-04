@@ -72,7 +72,8 @@ class RemoveBadEdgeData(SearchData):
     Stores all the data that needs to be shared between processes when
     running the removeBadEdge() routine.
     """
-    def __init__( self, s, nProcesses, interval, isBad, excess, useMin ):
+    def __init__( self, s, nProcesses, interval, isBad, excess, useMin,
+            badEdges ):
         """
         Initialises shared search data.
 
@@ -84,11 +85,12 @@ class RemoveBadEdgeData(SearchData):
 
         # Initial triangulation.
         t = Triangulation3.fromIsoSig(s)
-        b = [ e.index() for e in t.edges() if isBad(e) ]
+        if badEdges is None:
+            badEdges = [ e.index() for e in t.edges() if isBad(e) ]
         if useMin:
-            c = complexity( t, b, 0 )
+            c = complexity( t, badEdges, 0 )
         else:
-            c = complexity( t, b )
+            c = complexity( t, badEdges )
         self._minSig = { c[0]: s }
         self._current = s
 
@@ -99,7 +101,7 @@ class RemoveBadEdgeData(SearchData):
         self._maxBadEdges = self._target + excess
 
         # Enqueue the initial isomorphism signature.
-        self.enqueue( s, c, tuple(b),
+        self.enqueue( s, c, tuple(badEdges),
                 None ) # Initial iso sig has no source.
 
     def _minComplexity( self, badEdgeCount ):
@@ -462,7 +464,8 @@ def removeBadEdgeLoop_( shared, lock, cond, useMin ):
 
 
 def removeBadEdge(
-        s, nProcesses, interval, isBad, badName, excess=0, useMin=False ):
+        s, nProcesses, interval, isBad, badName, excess=0, useMin=False,
+        badEdges=None ):
     """
     Starting at the given isomorphism signature s, and using the given number
     of parallel processes, searches for a 3-2 move that reduces the number of
@@ -512,7 +515,7 @@ def removeBadEdge(
     lock = manager.Lock()
     cond = manager.Condition(lock)
     shared = manager.RemoveBadEdgeData(
-            s, nProcesses, interval, isBad, excess, useMin )
+            s, nProcesses, interval, isBad, excess, useMin, badEdges )
     processes = [
             Process( target=removeBadEdgeLoop_,
                 args=( shared, lock, cond, useMin ) )

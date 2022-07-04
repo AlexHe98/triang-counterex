@@ -12,29 +12,33 @@ search prioritises triangulations in which:
     routine); and
 (3) the number of tetrahedra is small.
 """
-from sys import argv, stdout
+import sys
 from triangCounterexHelpers import possibleFibre
 from removeBadEdge import removeBadEdge
 
 
 if __name__ == "__main__":
-    sig = argv[1]
-    nProcesses = int( argv[2] )
-    interval = int( argv[3] )
-    try:
-        minArg = argv[4]
-    except IndexError:
+    sig = sys.argv[1]
+    nProcesses = int( sys.argv[2] )
+    interval = int( sys.argv[3] )
+    maxMin = sys.argv[4]
+    if maxMin == "max":
         useMin = False
+    elif maxMin == "min":
+        useMin = True
     else:
-        if minArg == "min":
-            useMin = True
-        else:
-            print( "    Unknown argument \"{}\".".format(minArg) )
-            useMin = False
+        sys.exit( "Unknown argument \"{}\".".format(maxMin) )
+    try:
+        badEdgeString = sys.argv[5]
+    except IndexError:
+        badEdges = None
+    else:
+        # Parse badEdgeString as a list of edge indices.
+        badEdges = [ int(e) for e in badEdgeString.split(",") ]
     print( "Removing {}. Sig: {}, #Processes: {}. UseMin?: {}".format(
         "Seifert fibres", sig, nProcesses, useMin ) )
-    stdout.flush()
+    sys.stdout.flush()
     print( "Results: {}\n".format( removeBadEdge(
         sig, nProcesses, interval, possibleFibre,
-        "Seifert fibres", 1, useMin ) ) )
+        "Seifert fibres", 1, useMin, badEdges ) ) )
 
