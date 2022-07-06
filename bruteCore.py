@@ -13,7 +13,7 @@ from triangCounterexHelpers import isCore
 if __name__ == "__main__":
     start = default_timer()
     prev = start
-    interval = 10800 # Print update every 3 hours. 
+    interval = 10800 # Print update every 3 hours.
     tested = 0
     found = 0
     msg = "Time: {:.6f}. Tested: {}. Found: {}.{}"
