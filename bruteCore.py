@@ -22,6 +22,7 @@ if __name__ == "__main__":
         if time - prev > interval:
             prev = time
             print( msg.format( time - start, tested, found, "" ) )
+            stdout.flush()
         tested += 1
         sig = line.rstrip()
         tri = Triangulation3.fromIsoSig(sig)
@@ -34,5 +35,6 @@ if __name__ == "__main__":
             found += 1
             prev = default_timer()
             print( msg.format( prev - start, tested, found, " " + sig ) )
+            stdout.flush()
     print( msg.format( default_timer() - start, tested, found, "" ) )
     print()
