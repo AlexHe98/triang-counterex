@@ -110,7 +110,7 @@ def cutOneSolidTorus(tri):
         with exactly two real torus boundary components (and no other
         boundary components).
     """
-    surfs = NormalSurfaces.enumerate( tri, NS_STANDARD )
+    surfs = NormalSurfaces( tri, NS_STANDARD )
     annuli = []
     for s in surfs:
         if not s.hasRealBoundary():
@@ -158,7 +158,7 @@ def cutTwoSolidTori(tri):
         with exactly one real torus boundary component (and no other boundary
         components).
     """
-    surfs = NormalSurfaces.enumerate( tri, NS_STANDARD )
+    surfs = NormalSurfaces( tri, NS_STANDARD )
     annuli = []
     for s in surfs:
         if not s.hasRealBoundary():
@@ -300,7 +300,7 @@ def isFibre(edge):
     #       at least two of the essential tori of interest must appear as
     #       either: a vertex normal torus, or the double of a vertex normal
     #       Klein bottle.
-    surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
+    surfs = NormalSurfaces( drilled, NS_STANDARD )
     annuli = []
     tori = []
     for s in surfs:
@@ -547,7 +547,7 @@ def isExceptionalFibre(edge):
     # vertex normal surface or as the double of a one-sided vertex normal
     # surface (the latter case is necessary because Jaco and Tollefson do not
     # consider one-sided surfaces to be vertex surfaces).
-    surfs = NormalSurfaces.enumerate( drilled, NS_STANDARD )
+    surfs = NormalSurfaces( drilled, NS_STANDARD )
     annuli = []
     for s in surfs:
         if not s.hasRealBoundary():
