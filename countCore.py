@@ -48,3 +48,4 @@ if __name__ == "__main__":
             found += 1
     print( msg.format(
         default_timer() - start, tested, minCore, found, "" ) )
+    print()
