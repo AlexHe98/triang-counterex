@@ -35,9 +35,9 @@ if __name__ == "__main__":
             if isCore(edge):
                 coreCount += 1
                 # Break out early wherever possible.
-                if coreCount > minCore:
+                if ( minCore is not None ) and ( coreCount > minCore ):
                     break
-        if coreCount < minCore:
+        if ( minCore is None ) or ( coreCount < minCore ):
             found = 1
             minCore = coreCount
             prev = default_timer()
