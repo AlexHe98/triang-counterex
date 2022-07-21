@@ -1,3 +1,6 @@
+"""
+Helper routines for running multiprocessed brute-force searches.
+"""
 from sys import stdout
 from timeit import default_timer
 from regina import *
@@ -10,12 +13,13 @@ def setup(d, i):
     ints = i
 
 
-def testSig(line):
-    prev = 1
-    interval = 0
-    tested = 1
-    minCore = 2
-    found = 3
+def countCoreTest(line):
+    start = 0 # doubles[start] == start time.
+    prev = 1 # doubles[prev] == previous update time.
+    interval = 0 # ints[interval] == update interval.
+    tested = 1 # ints[tested] == total number of iso sigs processed.
+    minCore = 2 # ints[minCore] == current minimum number of core edges.
+    found = 3 # ints[found] == number of sigs that achieve current minimum.
     msg = "Time: {:.6f}. Tested: {}. Min: {}. Found: {}.{}"
     with ints.get_lock():
         # When ints and doubles are both locked, always lock ints first.
@@ -23,7 +27,7 @@ def testSig(line):
             time = default_timer()
             if time - doubles[prev] > ints[interval]:
                 doubles[prev] = time
-                print( msg.format( time - doubles[0],
+                print( msg.format( time - doubles[start],
                     ints[tested], ints[minCore], ints[found], "" ) )
                 stdout.flush()
         ints[tested] += 1
@@ -45,7 +49,7 @@ def testSig(line):
             # first.
             with doubles.get_lock():
                 doubles[prev] = default_timer()
-                print( msg.format( doubles[prev] - doubles[0],
+                print( msg.format( doubles[prev] - doubles[start],
                     ints[tested], ints[minCore], ints[found],
                     " " + sig ) )
                 stdout.flush()

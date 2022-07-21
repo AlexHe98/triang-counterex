@@ -10,7 +10,7 @@ yields an ideal triangulation of the solid torus.
 from sys import argv, stdin
 from timeit import default_timer
 from multiprocessing import Pool, Array
-from countCoreHelpers import *
+from bruteForceHelpers import setup, countCoreTest
 
 
 if __name__ == "__main__":
@@ -24,13 +24,14 @@ if __name__ == "__main__":
         -1, # Minimum number of core edges (negative indicates no bound).
         0 ] ) # Number of iso sigs that achieve the current minimum. 
 
-    # Read iso sigs from standard input, and distribute the testing workload
-    # across the given number of processes.
+    # For each iso sig that we read from standard input, count the number of
+    # core edges in the corresponding triangulation (but terminate early if
+    # we find too many core edges).
     with Pool(
             processes=int( argv[1] ),
             initializer=setup,
             initargs=[doubles, ints] ) as pool:
-        for _ in pool.imap( testSig, stdin ):
+        for _ in pool.imap( countCoreTest, stdin ):
             pass
     print( "Time: {:.6f}. Tested: {}. Min: {}. Found: {}.{}".format(
         default_timer() - start, ints[1], ints[2], ints[3], "" ) )
