@@ -13,6 +13,41 @@ def setup(d, i):
     ints = i
 
 
+def bruteCoreTest(line):
+    start = 0 # doubles[start] == start time.
+    prev = 1 # doubles[prev] == previous update time.
+    interval = 0 # ints[interval] == update interval.
+    tested = 1 # ints[tested] == total number of iso sigs processed.
+    found = 2 # ints[found] == number of sigs that have no core edges.
+    msg = "Time: {:.6f}. Tested: {}. Found: {}.{}"
+    with ints.get_lock():
+        # When ints and doubles are both locked, always lock ints first.
+        with doubles.get_lock():
+            time = default_timer()
+            if time - doubles[prev] > ints[interval]:
+                doubles[prev] = time
+                print( msg.format( time - doubles[start],
+                    ints[tested], ints[found], "" ) )
+                stdout.flush()
+        ints[tested] += 1
+    sig = line.rstrip()
+    tri = Triangulation3.fromIsoSig(sig)
+    noCore = True
+    for edge in tri.edges():
+        if isCore(edge):
+            noCore = False
+            break
+    if noCore:
+        with ints.get_lock():
+            ints[found] += 1
+            # When ints and doubles are both locked, always lock ints first.
+            with doubles.get_lock():
+                doubles[prev] = default_timer()
+                print( msg.format( doubles[prev] - doubles[start],
+                    ints[tested], ints[found], " " + sig ) )
+                stdout.flush()
+
+
 def countCoreTest(line):
     start = 0 # doubles[start] == start time.
     prev = 1 # doubles[prev] == previous update time.
@@ -45,8 +80,7 @@ def countCoreTest(line):
         if ( ints[minCore] < 0 ) or ( coreCount < ints[minCore] ):
             ints[found] = 1
             ints[minCore] = coreCount
-            # When ints and doubles are both locked, always lock ints
-            # first.
+            # When ints and doubles are both locked, always lock ints first.
             with doubles.get_lock():
                 doubles[prev] = default_timer()
                 print( msg.format( doubles[prev] - doubles[start],

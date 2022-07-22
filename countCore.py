@@ -33,6 +33,6 @@ if __name__ == "__main__":
             initargs=[doubles, ints] ) as pool:
         for _ in pool.imap( countCoreTest, stdin ):
             pass
-    print( "Time: {:.6f}. Tested: {}. Min: {}. Found: {}.{}".format(
-        default_timer() - start, ints[1], ints[2], ints[3], "" ) )
+    print( "Time: {:.6f}. Tested: {}. Min: {}. Found: {}.".format(
+        default_timer() - start, ints[1], ints[2], ints[3] ) )
     print()

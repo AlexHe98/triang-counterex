@@ -1,40 +1,34 @@
 """
-Given a collection of isomorphism signatures, searches for a signature whose
-corresponding triangulation is 1-vertex and has no edge that forms a "core
-loop"; in other words, for each edge e of the triangulation, pinching e
-yields an ideal triangulation that does *not* represent the solid torus.
+Given a series of isomorphism via standard input, searches for isomorphism
+signatures whose triangulations have no core edges.
+
+By "core edge", we mean an edge e of the triangulation such that pinching e
+yields an ideal triangulation of the solid torus.
 """
-import fileinput
-from sys import stdout
+from sys import argv, stdin
 from timeit import default_timer
-from regina import *
-from triangCounterexHelpers import isCore
+from multiprocessing import Pool, Array
+from bruteForceHelpers import setup, bruteCoreTest
+
 
 if __name__ == "__main__":
     start = default_timer()
-    prev = start
-    interval = 10800 # Print update every 3 hours.
-    tested = 0
-    found = 0
-    msg = "Time: {:.6f}. Tested: {}. Found: {}.{}"
-    for line in fileinput.input():
-        time = default_timer()
-        if time - prev > interval:
-            prev = time
-            print( msg.format( time - start, tested, found, "" ) )
-            stdout.flush()
-        tested += 1
-        sig = line.rstrip()
-        tri = Triangulation3.fromIsoSig(sig)
-        noCore = True
-        for edge in tri.edges():
-            if isCore(edge):
-                noCore = False
-                break
-        if noCore:
-            found += 1
-            prev = default_timer()
-            print( msg.format( prev - start, tested, found, " " + sig ) )
-            stdout.flush()
-    print( msg.format( default_timer() - start, tested, found, "" ) )
+    doubles = Array( "d", [
+        start, # Start time.
+        start ] ) # Previous update time (initially equal to start time).
+    ints = Array( "i", [
+        21600, # Print update every 6 hours.
+        0, # Number of iso sigs tested.
+        0 ] ) # Number of iso sigs that have no core edges.
+
+    # For each iso sig that we read from standard input, check whether the
+    # corresponding triangulation has any core edges.
+    with Pool(
+            processes=int( argv[1] ),
+            initializer=setup,
+            initargs=[doubles, ints] ) as pool:
+        for _ in pool.imap( bruteCoreTest, stdin ):
+            pass
+    print( "Time: {:.6f}. Tested: {}. Found: {}.".format(
+        default_timer() - start, ints[1], ints[2] ) )
     print()
