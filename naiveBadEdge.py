@@ -1,12 +1,11 @@
 """
 Given a triangulation with at least one "bad" edge (where "bad" stands for
 any computable topological property of an edge), search for a 3-2 move that
-removes a bad edge, prioritising triangulations in which:
-(1) the maximum "multiplicity defect" among bad edges is small (see the
-    mulDefect() routine);
-(2) the maximum "degree defect" among bad edges is small (see the degDefect()
-    routine); and
-(3) the number of tetrahedra is small.
+removes a bad edge.
+
+This script naively prioritises triangulations with fewer tetrahedra. The
+main purpose is to demonstrate the effectiveness of the more sophisticated
+heuristic used in removeBadEdge.py.
 """
 from sys import stdout
 from timeit import default_timer
@@ -16,64 +15,15 @@ from queue import Empty
 from regina import *
 from search import SearchData
 from pachner import twoThree, threeTwo
-from triangCounterexHelpers import mulDefect
-from triangCounterexHelpers import degDefect
 from triangCounterexHelpers import relabelEdges
 
 
-def complexity( tri, badEdges, excess=None ):
-    """
-    Returns a measure for how far away we are from removing the given
-    collection of bad edges from the given triangulation.
-
-    If excess is None (the default), then the returned complexity is a tuple
-    consisting of:
-    (0) The number of bad edges (i.e., the length of the given collection of
-        bad edge indices).
-    (1) The maximum "multiplicity defect" among the given bad edges (see the
-        mulDefect() routine).
-    (2) The maximum "degree defect" among the given bad edges (see the
-        degDefect() routine).
-    (3) The number of tetrahedra in the given triangulation.
-
-    Otherwise, excess should be an integer describing the excess number of
-    bad edges; i.e., if we let n denote the excess, then this indicates that
-    we need to remove n bad edges to return to the "initial" number of bad
-    edges. In this case, the returned complexity is a tuple consisting of:
-    (0) The number of bad edges.
-    (1) The maximum "multiplicity defect" among the n+1 bad edges with the
-        smallest such defect.
-    (2) The maximum "degree defect" among the n+1 bad edges with the smallest
-        such defect.
-    (3) The number of tetrahedra in the given triangulation.
-    """
-    if badEdges:
-        mulDefs = [ mulDefect( tri.edge(i) ) for i in badEdges ]
-        degDefs = [ degDefect( tri.edge(i) ) for i in badEdges ]
-    else:
-        mulDefs = [0]
-        degDefs = [0]
-    if excess is None:
-        return ( len(badEdges),
-                max(mulDefs),
-                max(degDefs),
-                tri.size() )
-    else:
-        # Use minimums instead of maximums.
-        trunc = max( 0, excess )
-        return ( len(badEdges),
-                sorted(mulDefs)[trunc],
-                sorted(degDefs)[trunc],
-                tri.size() )
-
-
-class RemoveBadEdgeData(SearchData):
+class NaiveBadEdgeData(SearchData):
     """
     Stores all the data that needs to be shared between processes when
-    running the removeBadEdge() routine.
+    running the naiveBadEdge() routine.
     """
-    def __init__( self, s, nProcesses, interval, isBad, excess, useMin,
-            badEdges ):
+    def __init__( self, s, nProcesses, interval, isBad, badEdges ):
         """
         Initialises shared search data.
 
@@ -87,50 +37,36 @@ class RemoveBadEdgeData(SearchData):
         t = Triangulation3.fromIsoSig(s)
         if badEdges is None:
             badEdges = [ e.index() for e in t.edges() if isBad(e) ]
-        if useMin:
-            c = complexity( t, badEdges, 0 )
-        else:
-            c = complexity( t, badEdges )
-        self._minSig = { c[0]: s }
-        self._current = s
+        self._height = t.size()
+        badEdgeCount = len(badEdges)
 
-        # The current number of bad edges is given by c[0]. Our target is to
-        # get below this number. Moreover, during our search, we never allow
-        # the number of bad edges to exceed c[0]+excess.
-        self._target = c[0]
-        self._maxBadEdges = self._target + excess
+        # Our target is to get below the current number of bad edges.
+        self._target = badEdgeCount
 
         # Enqueue the initial isomorphism signature.
-        self.enqueue( s, c, tuple(badEdges),
+        self.enqueue( s, self._height, badEdges,
                 None ) # Initial iso sig has no source.
-
-    def _minComplexity( self, badEdgeCount ):
-        return self._details[ self._minSig[badEdgeCount] ][2]
 
     def info(self):
         """
         Returns a string describing the time elapsed, the number of
         triangulations discovered, the number of triangulations explored, and
-        details of the triangulation with the smallest complexity that has
-        been discovered so far.
+        the maximum height reached in the Pachner graph.
         """
-        minFormat = " Min{}: {}, {}."
-        msg = super().info()
-        for badEdgeCount in self._minSig:
-            msg += minFormat.format(
-                    badEdgeCount,
-                    self._minComplexity(badEdgeCount),
-                    self._minSig[badEdgeCount] )
-        msg += " Current: {}, {}.".format(
-                self._details[ self._current ][2],
-                self._current )
-        return msg
+        return super().info() + " Height: {}.".format( self._height )
 
-    def _updateMinSig( self, sig, priority ):
-        badEdgeCount = priority[0]
-        if ( ( badEdgeCount not in self._minSig ) or
-                ( priority < self._minComplexity(badEdgeCount) ) ):
-            self._minSig[badEdgeCount] = sig
+    def _printInfo( self, check ):
+        time = default_timer()
+        if check and time - self._previousInfo < self._interval:
+            return
+        self._previousInfo = time
+        print( self.info() )
+        stdout.flush()
+
+    def _updateHeight( self, height ):
+        if height > self._height:
+            self._height = height
+            self._printInfo(False)
 
     def target(self):
         """
@@ -138,20 +74,14 @@ class RemoveBadEdgeData(SearchData):
         """
         return self._target
 
-    def maxBadEdges(self):
-        """
-        Returns the maximum allowed number of bad edges.
-        """
-        return self._maxBadEdges
-
-    def newResult( self, sig, priority, badEdges, source ):
+    def newResult( self, sig, height, badEdges, source ):
         """
         Records the given sig as a new result, and instructs all processes to
         stop as soon as possible.
         """
-        self._results.append( ( sig, priority ) )
-        self._details[sig] = ( badEdges, source, priority )
-        self._updateMinSig( sig, priority )
+        self._results.append( ( sig, height ) )
+        self._details[sig] = ( badEdges, source, height )
+        self._updateHeight(height)
         self._stop = True
 
     def badEdges( self, sig ):
@@ -163,18 +93,18 @@ class RemoveBadEdgeData(SearchData):
         """
         return self._details[sig][0]
 
-    def enqueue( self, sig, priority, badEdges, source ):
+    def enqueue( self, sig, height, badEdges, source ):
         """
-        Pushes the given sig onto the queue with the given priority, assigns
-        badEdges as the tuple returned by self.badEdges(sig), and records the
-        given source information.
+        Pushes the given sig onto the queue, assigns badEdges as the tuple
+        returned by self.badEdges(sig), and records the given source
+        information.
         """
         self._queue.put(
-                ( priority, self._total, sig ),
+                ( height, self._total, sig ),
                 False )
         self._total += 1
-        self._details[sig] = ( badEdges, source, priority )
-        self._updateMinSig( sig, priority )
+        self._details[sig] = ( badEdges, source, height )
+        self._updateHeight(height)
 
     def dequeue(self):
         """
@@ -184,19 +114,14 @@ class RemoveBadEdgeData(SearchData):
         Exceptions:
         --> Raises Empty if the queue is empty.
         """
-        time = default_timer()
-        if time - self._previousInfo > self._interval:
-            self._previousInfo = time
-            print( self.info() )
-            stdout.flush()
+        self._printInfo(True)
 
         # Try to pop from queue immediately, since we don't want to change
         # anything if it turns out that the queue is currently empty.
-        priority, _, sig = self._queue.get(False)
+        height, _, sig = self._queue.get(False)
         self._explored += 1
         source = self._details[sig][1]
-        self._current = sig
-        return ( sig, priority, source )
+        return ( sig, height, source )
 
     def backtrack( self, sig ):
         """
@@ -211,21 +136,21 @@ class RemoveBadEdgeData(SearchData):
         return back[::-1]
 
 
-class RemoveBadEdgeManager(SyncManager):
+class NaiveBadEdgeManager(SyncManager):
     pass
-RemoveBadEdgeManager.register( "RemoveBadEdgeData", RemoveBadEdgeData )
+NaiveBadEdgeManager.register( "NaiveBadEdgeData", NaiveBadEdgeData )
 
 
-def removeBadEdgeGreedy_(
-        tri, sig, priority, source, badEdges, target, useMin,
-        shared, lock, cond ):
+def naiveBadEdgeGreedy_(
+        tri, sig, height, source, badEdges, target, shared, lock, cond ):
     if source is None:
         steps = 1
     else:
         steps = source[0] + 1
 
     # Try to remove bad edges using 3-2 moves.
-    atTarget = ( priority[0] == target )
+    newHeight = height - 1
+    atTarget = ( len(badEdges) == target )
     for i in badEdges:
         result = threeTwo( tri.edge(i) )
         if result is None:
@@ -240,21 +165,16 @@ def removeBadEdgeGreedy_(
 
         # We haven't seen newSig before. Did we get below the target?
         newBadEdges = [ newTrans[j] for j in badEdges if j != i ]
-        if useMin:
-            newPriority = complexity(
-                    newTri, newBadEdges, priority[0] - 1 - target )
-        else:
-            newPriority = complexity( newTri, newBadEdges )
         newSource = ( steps,
                 ( "3-2", i ),
-                priority,
+                height,
                 sig )
         relBadEdges = tuple( relabelEdges( newTri, newBadEdges, newIsom ) )
         if atTarget:
             # We started at the target, so removing a bad edge gets us below!
             with lock:
                 shared.newResult(
-                        newSig, newPriority, relBadEdges, newSource )
+                        newSig, newHeight, relBadEdges, newSource )
             return True
 
         # We didn't get below the target, so we should continue trying to
@@ -262,19 +182,18 @@ def removeBadEdgeGreedy_(
         with lock:
             if shared.queueEmpty():
                 shared.enqueue(
-                        newSig, newPriority, relBadEdges, newSource )
+                        newSig, newHeight, relBadEdges, newSource )
                 cond.notify_all()
             else:
                 shared.enqueue(
-                        newSig, newPriority, relBadEdges, newSource )
-        if removeBadEdgeGreedy_( newIsom(newTri), newSig, newPriority,
-                newSource, relBadEdges, target, useMin, shared, lock, cond ):
+                        newSig, newHeight, relBadEdges, newSource )
+        if naiveBadEdgeGreedy_( newIsom(newTri), newSig, newHeight,
+                newSource, relBadEdges, target, shared, lock, cond ):
             return True
     return False
 
 
-def removeBadEdgeExplore_(
-        sig, priority, source, useMin, shared, lock, cond ):
+def naiveBadEdgeExplore_( sig, height, source, shared, lock, cond ):
     # NOTES
     """
     --> Many of the computations can be done independently of other
@@ -289,8 +208,8 @@ def removeBadEdgeExplore_(
     # If sig was generated by the search (i.e., source is not None), then we
     # would already have greedily attempted to remove bad edges.
     if source is None:
-        if removeBadEdgeGreedy_( tri, sig, priority, source,
-                badEdges, target, useMin, shared, lock, cond ):
+        if naiveBadEdgeGreedy_( tri, sig, height, source, badEdges, target,
+                shared, lock, cond ):
             # Terminate immediately if we found a result.
             return
         steps = 1
@@ -298,6 +217,7 @@ def removeBadEdgeExplore_(
         steps = source[0] + 1
 
     # Try all possible 3-2 moves on *good* edges.
+    newHeight = height - 1
     for edge in tri.edges():
         if edge.index() in badEdges:
             continue
@@ -312,38 +232,31 @@ def removeBadEdgeExplore_(
             if shared.alreadySeen(newSig):
                 continue
         newBadEdges = [ newTrans[i] for i in badEdges ]
-        if useMin:
-            newPriority = complexity(
-                    newTri, newBadEdges, priority[0] - target )
-        else:
-            newPriority = complexity( newTri, newBadEdges )
         newSource = ( steps,
                 ( "3-2", edge.index() ),
-                priority,
+                height,
                 sig )
         relBadEdges = tuple( relabelEdges(
             newTri, newBadEdges, newIsom ) )
         with lock:
             if shared.queueEmpty():
                 shared.enqueue(
-                        newSig, newPriority, relBadEdges, newSource )
+                        newSig, newHeight, relBadEdges, newSource )
                 cond.notify_all()
             else:
                 shared.enqueue(
-                        newSig, newPriority, relBadEdges, newSource )
+                        newSig, newHeight, relBadEdges, newSource )
 
         # Can we remove bad edges?
-        if removeBadEdgeGreedy_( newIsom(newTri), newSig, newPriority,
-                newSource, relBadEdges, target, useMin, shared, lock, cond ):
+        if naiveBadEdgeGreedy_( newIsom(newTri), newSig, newHeight,
+                newSource, relBadEdges, target, shared, lock, cond ):
             # Terminate immediately if we found a result.
             return
 
-    # Now try all 2-3 moves, as long as they don't take us beyond the maximum
-    # allowed number of bad edges.
+    # Now try all 2-3 moves.
     with lock:
-        maxBadEdges = shared.maxBadEdges()
         isBad = shared.getIsBadRoutine()
-    ignore = ( priority[0] == maxBadEdges )
+    newHeight = height + 1
     for triangle in tri.triangles():
         result = twoThree(triangle)
         if result is None:
@@ -357,47 +270,34 @@ def removeBadEdgeExplore_(
                 continue
 
         # Did we introduce a bad edge?
-        newEdge = newTri.edge( newTrans[-1] )
-        newEdgeIsBad = isBad(newEdge)
-        if ignore and newEdgeIsBad:
-            continue
-
-        # We should enqueue the newSig.
         newBadEdges = [ newTrans[i] for i in badEdges ]
-        if newEdgeIsBad:
+        if isBad( newTri.edge( newTrans[-1] ) ):
             newBadEdges.append( newTrans[-1] )
-        if useMin:
-            if newEdgeIsBad:
-                newPriority = complexity(
-                        newTri, newBadEdges, priority[0] + 1 - target )
-            else:
-                newPriority = complexity(
-                        newTri, newBadEdges, priority[0] - target )
-        else:
-            newPriority = complexity( newTri, newBadEdges )
+        
+        # We should enqueue the newSig.
         newSource = ( steps,
                 ( "2-3", triangle.index() ),
-                priority,
+                height,
                 sig )
         relBadEdges = tuple( relabelEdges(
             newTri, newBadEdges, newIsom ) )
         with lock:
             if shared.queueEmpty():
                 shared.enqueue(
-                        newSig, newPriority, relBadEdges, newSource )
+                        newSig, newHeight, relBadEdges, newSource )
                 cond.notify_all()
             else:
                 shared.enqueue(
-                        newSig, newPriority, relBadEdges, newSource )
+                        newSig, newHeight, relBadEdges, newSource )
 
         # Can we remove bad edges?
-        if removeBadEdgeGreedy_( newIsom(newTri), newSig, newPriority,
-                newSource, relBadEdges, target, useMin, shared, lock, cond ):
+        if naiveBadEdgeGreedy_( newIsom(newTri), newSig, newHeight,
+                newSource, relBadEdges, target, shared, lock, cond ):
             # Terminate immediately if we found a result.
             return
 
 
-def removeBadEdgeLoop_( shared, lock, cond, useMin ):
+def naiveBadEdgeLoop_( shared, lock, cond ):
     # NOTES
     """
     --> To minimise testing whether edges are bad (which could potentially be
@@ -408,7 +308,7 @@ def removeBadEdgeLoop_( shared, lock, cond, useMin ):
         be added to the queue).
     --> Two reasons to stop:
         (1) We have been instructed to stop (because we have successfully
-            removed a bad edge).
+            reduced the number of bad edges).
         (2) The shared queue is empty and no other processes are running.
     """
     while True:
@@ -422,7 +322,7 @@ def removeBadEdgeLoop_( shared, lock, cond, useMin ):
 
             # Try popping the next sig.
             try:
-                sig, priority, source = shared.dequeue()
+                sig, height, source = shared.dequeue()
             except Empty:
                 # There is currently nothing to explore in the shared queue,
                 # so tell shared that we are about to pause this process.
@@ -457,31 +357,20 @@ def removeBadEdgeLoop_( shared, lock, cond, useMin ):
                 continue
 
         # Explore sig. We do most of this independently of other processes.
-        removeBadEdgeExplore_(
-                sig, priority, source, useMin, shared, lock, cond )
+        naiveBadEdgeExplore_( sig, height, source, shared, lock, cond )
 
 
-def removeBadEdge(
-        s, nProcesses, interval, isBad, badName, excess=0, useMin=False,
-        badEdges=None ):
+def naiveBadEdge( s, nProcesses, interval, isBad, badName, badEdges=None ):
     """
     Starting at the given isomorphism signature s, and using the given number
-    of parallel processes, greedily searches the Pachner graph for a
+    of parallel processes, naively searches the Pachner graph for a
     triangulation with fewer bad edges than s.
 
     We consider an edge e to be bad if and only if isBad(e) returns True.
 
-    The search abides by the following constraints:
-    (1) If the initial isomorphism signature s corresponds to a triangulation
-        with b bad edges, then we ignore any 2-3 moves that cause the number
-        of bad edges to exceed b by more than the given excess.
-    (2) Priority is given to triangulations in which the maximum
-        "multiplicity defect" (see the mulDefect() routine) among bad edges
-        is small, then to triangulations in which the maximum "degree defect"
-        (see the degDefect() routine) among bad edges is small, and then to
-        triangulations with fewer tetrahedra.
-    (3) Triangulations with equal priority are processed in order of
-        insertion into a queue.
+    The search prioritises triangulations with fewer tetrahedra. When the
+    number of tetrahedra is equal, the triangulations are processed in order
+    of insertion into a queue.
 
     If the search successfully finds one or more triangulations with fewer
     bad edges than s, then this routine returns a list containing all of the
@@ -489,11 +378,6 @@ def removeBadEdge(
     parallel processes to each find such a triangulation at roughly the same
     time, which is why the returned list may contain more than one
     isomorphism signature).
-
-    It is also possible for the search to "get stuck" in a situation where
-    the only moves available are 2-3 moves that increase the number of bad
-    edges beyond the allowed excess. Since we ignore all such moves, this
-    routine returns an empty list whenever we get stuck in this way.
 
     Note: When run with multiple processes (i.e., nProcesses > 1), this
     routine is not completely deterministic because insertion order may vary
@@ -513,17 +397,16 @@ def removeBadEdge(
     --> The function isBad takes a single edge as input, and
         deterministically outputs either True or False (corresponding to
         whether the edge should be considered bad).
-    --> The given excess is a non-negative integer.
     """
-    manager = RemoveBadEdgeManager()
+    manager = NaiveBadEdgeManager()
     manager.start()
     lock = manager.Lock()
     cond = manager.Condition(lock)
-    shared = manager.RemoveBadEdgeData(
-            s, nProcesses, interval, isBad, excess, useMin, badEdges )
+    shared = manager.NaiveBadEdgeData(
+            s, nProcesses, interval, isBad, badEdges )
     processes = [
-            Process( target=removeBadEdgeLoop_,
-                args=( shared, lock, cond, useMin ) )
+            Process( target=naiveBadEdgeLoop_,
+                args=( shared, lock, cond ) )
             for _ in range(nProcesses) ]
     for p in processes:
         p.start()
@@ -533,10 +416,10 @@ def removeBadEdge(
     # Print some info, and then return results.
     print( shared.info() )
     results = shared.getResults()
-    for r, comp in results:
+    for r, nTet in results:
         rem = shared.badEdges(r)
-        print( "Result: {}. Complexity: {}. {}: {}".format(
-            r, comp, badName, rem ) )
+        print( "Result: {}. Size: {}. {}: {}".format(
+            r, nTet, badName, rem ) )
         path = shared.backtrack(r)
         for s in path:
             print( "    {}".format(s) )
