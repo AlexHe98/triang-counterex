@@ -100,6 +100,10 @@ class RemoveBadEdgeData(SearchData):
         self._target = c[0]
         self._maxBadEdges = self._target + excess
 
+        #TODO
+        # Avoid getting stuck on one particular complexity.
+        self._complexityCounts = dict()
+
         # Enqueue the initial isomorphism signature.
         self.enqueue( s, c, tuple(badEdges),
                 None ) # Initial iso sig has no source.
@@ -121,13 +125,27 @@ class RemoveBadEdgeData(SearchData):
                     badEdgeCount,
                     self._minComplexity(badEdgeCount),
                     self._minSig[badEdgeCount] )
-        msg += " Current: {}, {}.".format(
+#        msg += " Current: {}, {}.".format(
+#                self._details[ self._current ][2],
+#                self._current )
+        #TODO Include source in message.
+        source = self._details[ self._current ][1]
+        if source is None:
+            sourceComplexity = None
+            sourceSig = None
+        else:
+            sourceComplexity = source[2]
+            sourceSig = source[3]
+        msg += " Current: {}, {} <- {}, {}.".format(
                 self._details[ self._current ][2],
-                self._current )
+                self._current,
+                sourceComplexity,
+                sourceSig )
         return msg
 
     def _updateMinSig( self, sig, priority ):
-        badEdgeCount = priority[0]
+        #TODO Fix this!
+        badEdgeCount = priority[1]
         if ( ( badEdgeCount not in self._minSig ) or
                 ( priority < self._minComplexity(badEdgeCount) ) ):
             self._minSig[badEdgeCount] = sig
@@ -149,9 +167,11 @@ class RemoveBadEdgeData(SearchData):
         Records the given sig as a new result, and instructs all processes to
         stop as soon as possible.
         """
-        self._results.append( ( sig, priority ) )
-        self._details[sig] = ( badEdges, source, priority )
-        self._updateMinSig( sig, priority )
+        #TODO Currently using workaround to deal with the tabu counter.
+        updatedPriority = ( 0, *priority )
+        self._results.append( ( sig, updatedPriority ) )
+        self._details[sig] = ( badEdges, source, updatedPriority )
+        self._updateMinSig( sig, updatedPriority )
         self._stop = True
 
     def badEdges( self, sig ):
@@ -169,12 +189,45 @@ class RemoveBadEdgeData(SearchData):
         badEdges as the tuple returned by self.badEdges(sig), and records the
         given source information.
         """
+#        currMul = priority[1]
+#        currDeg = priority[2]
+#        if source is None:
+#            x = 0
+#        else:
+#            srcX = source[2][1]
+#            srcMul = source[2][2]
+#            srcDeg = source[2][3]
+#            if currMul == srcMul:
+#                if currDeg == srcMul + 1:
+#                    x = srcX + 1
+#                elif currDeg < srcDeg:
+#                    x = max( 0, srcX - 1 )
+#                else:
+#                    x = srcX
+#            elif currMul < srcMul:
+#                x = max( 0, srcX - 1 )
+#            else:
+#                x = srcX
+#            #if source[2][1] == 0:
+#            #    shift = 0
+#            #else:
+#            #    shift = 1
+#            #srcMul = source[2][2]
+#            #srcDeg = source[2][3]
+#            #if currMul >= srcMul - shift and currDeg >= srcMul - shift:
+#            #    x = source[2][1] + 1
+#            #else:
+#            #    x = 0
+#        updatedPriority = (
+#                priority[0], x, currMul, currDeg, priority[3] )
+        updatedPriority = ( 0, *priority )
+        #TODO Insert counter into the priority tuple.
         self._queue.put(
-                ( priority, self._total, sig ),
+                ( updatedPriority, self._total, sig ),
                 False )
         self._total += 1
-        self._details[sig] = ( badEdges, source, priority )
-        self._updateMinSig( sig, priority )
+        self._details[sig] = ( badEdges, source, updatedPriority )
+        self._updateMinSig( sig, updatedPriority )
 
     def dequeue(self):
         """
@@ -190,9 +243,45 @@ class RemoveBadEdgeData(SearchData):
             print( self.info() )
             stdout.flush()
 
-        # Try to pop from queue immediately, since we don't want to change
-        # anything if it turns out that the queue is currently empty.
-        priority, _, sig = self._queue.get(False)
+        #TODO
+        # Keep popping from queue until we get something with complexity that we
+        # haven't seen too many times.
+        requeue = True
+        while requeue:
+            priority, oldTotal, sig = self._queue.get(False)
+            key = priority[:-1]
+            if key in self._complexityCounts:
+                self._complexityCounts[key] += 1
+                size = priority[-1]
+                
+                # Take the size as our threshold for "too many".
+                #TODO Determine the best threshold.
+                if self._complexityCounts[key] > max( size, 10 ):
+                    # Requeue, and then move on to the next item in the queue.
+                    updatedPriority = ( priority[0] + 1, *priority[1:] )
+                    self._queue.put(
+                            ( updatedPriority, oldTotal, sig ),
+                            False )
+                    continue
+                else:
+                    requeue = False
+            else:
+                self._complexityCounts[key] = 1
+                requeue = False
+
+        #TODO
+        # Decrement every *other* complexity count.
+        for p in self._complexityCounts:
+            if self._complexityCounts[p] > 0:
+                if p < key:
+                    self._complexityCounts[p] = 0
+                elif p > key:
+                    self._complexityCounts[p] -= 1
+            #if p != key and self._complexityCounts[p] > 0:
+            #    self._complexityCounts[p] -= 1
+
+        #TODO
+        #priority, _, sig = self._queue.get(False)
         self._explored += 1
         source = self._details[sig][1]
         self._current = sig
