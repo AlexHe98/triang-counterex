@@ -46,13 +46,31 @@ request a progress update every 10 seconds, run the following:
 > ``dir/regina-python removeCore.py cMcabbgqs 4 10``
 
 The scripts ``removeTunnel.py`` and ``removeFibre.py`` are similar, except
-that ``removeFibre.py`` takes one additional mandatory command-line argument
-and one additional optional command-line argument. For details, see the
-documentation in ``removeFibre.py``.
+that ``removeFibre.py`` takes two additional command-line arguments:
+* The first additional argument is mandatory, and must be either ``ult`` or
+    ``int``. This option controls how the search measures the complexities of
+    the triangulations that it encounters.
+    - If the argument is ``ult``, then the search tries to simultaneously
+        minimise the complexity of all bad edges, since the *ultimate* goal
+        is to remove all such edges.
+    - If the argument is ``int``, then the search instead focuses on an
+        *intermediate* goal: reducing the number of bad edges by one.
+    
+    For details, see the ``complexity()`` routine in ``removeBadEdges.py``.
+* The second additional argument is optional. If provided, this must be a
+    comma-separated list (*without* whitespace, e.g. ``1,6,8``) of integers
+    corresponding to indices of bad edges. In this context, an edge is bad if
+    it *might* be isotopic to a Seifert fibre; we emphasise that we do not
+    conclusively test whether edges really are isotopic to Seifert fibres.
+    This means that even if we have already identified edges in the initial
+    triangulation that are not bad, we cannot reliably recompute which edges
+    these are; the optional argument allows us to include this information as
+    part of the input.
 
 The scripts ``simplifyNoCore.py``, ``simplifyNoTunnel.py`` and
 ``simplifyNoFibre.py`` each take four command-line arguments:
-* An isomorphism signature.
+* An isomorphism signature for the triangulation that we would like to
+    simplify.
 * The number of concurrent processes to use.
 * The number of seconds to wait before printing a brief progress update.
 * The allowed excess height (i.e., the amount by which we are allowed to

@@ -22,13 +22,13 @@ if __name__ == "__main__":
     sig = sys.argv[1]
     nProcesses = int( sys.argv[2] )
     interval = int( sys.argv[3] )
-    maxMin = sys.argv[4]
-    if maxMin == "max":
-        useMin = False
-    elif maxMin == "min":
-        useMin = True
+    interOption = sys.argv[4]
+    if interOption == "ult":
+        inter = False
+    elif interOption == "int":
+        inter = True
     else:
-        sys.exit( "Unknown argument \"{}\".".format(maxMin) )
+        sys.exit( "Unknown argument \"{}\".".format(interOption) )
     try:
         badEdgeString = sys.argv[5]
     except IndexError:
@@ -36,10 +36,10 @@ if __name__ == "__main__":
     else:
         # Parse badEdgeString as a list of edge indices.
         badEdges = [ int(e) for e in badEdgeString.split(",") ]
-    print( "Greedily removing {}. Sig: {}, #Processes: {}. UseMin?: {}".format(
-        "Seifert fibres", sig, nProcesses, useMin ) )
+    print( "Greedily removing {}. Sig: {}, #Processes: {}. Int?: {}".format(
+        "Seifert fibres", sig, nProcesses, inter ) )
     sys.stdout.flush()
     print( "Results: {}\n".format( removeBadEdge(
         sig, nProcesses, interval, possibleFibre,
-        "Seifert fibres", 1, useMin, badEdges ) ) )
+        "Seifert fibres", 1, inter, badEdges ) ) )
 
