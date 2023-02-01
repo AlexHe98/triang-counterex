@@ -29,7 +29,7 @@ def pinchGivesHandlebody( edge, genus ):
     """
     tri = Triangulation3( edge.triangulation() )
     tri.pinchEdge( tri.edge( edge.index() ) )
-    return ( tri.isHandlebody() == genus )
+    return ( tri.recogniseHandlebody() == genus )
 
 
 def isTunnel( edge ):
